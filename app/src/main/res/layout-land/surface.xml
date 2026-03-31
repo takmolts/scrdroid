@@ -50,12 +50,12 @@
         tools:visibility="visible">
 
         <Button
-            android:id="@+id/fab_rotate"
+            android:id="@+id/fab_disconnect"
             style="?android:attr/buttonBarButtonStyle"
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:text="@string/fab_rotate"
-            android:textColor="@android:color/white"
+            android:text="@string/fab_disconnect"
+            android:textColor="#FFFF6666"
             android:textSize="13sp" />
 
         <Button

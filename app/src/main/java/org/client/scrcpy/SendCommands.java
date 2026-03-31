@@ -97,10 +97,6 @@ public class SendCommands {
 
     private CmdStatus startPortForward(Context context, String ip, int port, int serverport) {
         Log.i("Scrcpy", "try connect to ip: " + ip);
-        // 前回の残留状態をクリーンアップ
-        AdbHelper.adbCmd(App.mContext, "-s", ip + ":" + port, "forward", "--remove", "tcp:" + serverport);
-        AdbHelper.adbCmd(App.mContext, "disconnect", ip + ":" + port);
-
         AdbHelper.adbCmd(App.mContext, "connect", ip + ":" + port);
         // 复制server端到可执行目录
         String pushRet = AdbHelper.adbCmd(App.mContext, "-s", ip + ":" + port, "push", new File(
@@ -113,15 +109,20 @@ public class SendCommands {
         if (TextUtils.isEmpty(adbTextCmd)) {
             return CmdStatus.ERROR;
         }
-        // 开启本地端口 forward 转发
-        Log.i("Scrcpy", "开启本地端口转发");
-        AdbHelper.adbCmd(App.mContext, "-s", ip + ":" + port, "forward", "tcp:" + serverport, "tcp:" + 7007);
+        // ポートフォワード設定
+        String forwardRet = AdbHelper.adbCmd(App.mContext, "-s", ip + ":" + port, "forward", "tcp:" + serverport, "tcp:" + 7007);
+        Log.i("Scrcpy", "forwardRet: " + forwardRet);
         return CmdStatus.SUCCESS;
     }
 
     private void newAdbServerStart(String[] command) {
-        // 执行启动命令
-        AdbHelper.adbCmd(App.mContext, command);
+        // サーバー起動コマンドは長時間実行されるため、別スレッドで非同期実行する
+        // （adb shell app_process はサーバー停止まで返らない）
+        ThreadUtils.execute(() -> {
+            Log.i("Scrcpy", "launching scrcpy server on device...");
+            AdbHelper.adbCmd(App.mContext, command);
+            Log.i("Scrcpy", "scrcpy server process exited");
+        });
     }
 
 }

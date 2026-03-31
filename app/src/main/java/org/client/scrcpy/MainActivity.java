@@ -24,6 +24,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
@@ -33,6 +34,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListPopupWindow;
 import android.widget.Spinner;
@@ -336,7 +338,6 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     public void get_saved_preferences() {
         final EditText editTextServerHost = findViewById(R.id.editText_server_host);
         final Switch aSwitch0 = findViewById(R.id.switch0);
-        final Switch aSwitch1 = findViewById(R.id.switch1);
         final Switch switchForcePortrait = findViewById(R.id.switch_force_portrait);
         String historySpServerAdr = PreUtils.get(context, Constant.CONTROL_REMOTE_ADDR, "");
         if (TextUtils.isEmpty(historySpServerAdr)) {
@@ -348,28 +349,10 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             editTextServerHost.setText(historySpServerAdr);
         }
         aSwitch0.setChecked(PreUtils.get(context, Constant.CONTROL_NO, false));
-        aSwitch1.setChecked(PreUtils.get(context, Constant.CONTROL_NAV, false));
         switchForcePortrait.setChecked(PreUtils.get(context, Constant.CONTROL_FORCE_PORTRAIT, false));
         setSpinner(R.array.options_resolution_values, R.id.spinner_video_resolution, Constant.PREFERENCE_SPINNER_RESOLUTION);
         setSpinner(R.array.options_bitrate_keys, R.id.spinner_video_bitrate, Constant.PREFERENCE_SPINNER_BITRATE);
         setSpinner(R.array.options_delay_keys, R.id.delay_control_spinner, Constant.PREFERENCE_SPINNER_DELAY);
-        if (aSwitch0.isChecked()) {
-            aSwitch1.setClickable(false);
-            aSwitch1.setTextColor(Color.GRAY);
-            // aSwitch1.setVisibility(View.GONE);
-        }
-
-        aSwitch0.setOnClickListener(v -> {
-            if (aSwitch0.isChecked()) {
-                aSwitch1.setClickable(false);
-                aSwitch1.setTextColor(Color.GRAY);
-                // aSwitch1.setVisibility(View.GONE);
-            } else {
-                aSwitch1.setClickable(true);
-                aSwitch1.setTextColor(Color.WHITE);
-                // aSwitch1.setVisibility(View.VISIBLE);
-            }
-        });
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -475,12 +458,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         final Spinner delayControlSpinner = findViewById(R.id.delay_control_spinner);
         final Switch a_Switch0 = findViewById(R.id.switch0);
         boolean no_control = a_Switch0.isChecked();
-        final Switch a_Switch1 = findViewById(R.id.switch1);
-        boolean nav = a_Switch1.isChecked();
         final Switch switchFP = findViewById(R.id.switch_force_portrait);
         forcePortrait = switchFP.isChecked();
         PreUtils.put(context, Constant.CONTROL_NO, no_control);
-        PreUtils.put(context, Constant.CONTROL_NAV, nav);
         PreUtils.put(context, Constant.CONTROL_FORCE_PORTRAIT, forcePortrait);
 
         final String[] videoResolutions = getResources().getStringArray(R.array.options_resolution_values)[videoResolutionSpinner.getSelectedItemPosition()].split("x");
@@ -569,58 +549,80 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         start_Scrcpy_service();
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void setupFloatingMenu() {
         final Button fabToggle = findViewById(R.id.fab_toggle);
         final LinearLayout floatingPanel = findViewById(R.id.floating_panel);
-        final Button fabRotate = findViewById(R.id.fab_rotate);
+        final Button fabDisconnect = findViewById(R.id.fab_disconnect);
         final Button fabBack = findViewById(R.id.fab_back);
         final Button fabHome = findViewById(R.id.fab_home);
         final Button fabAppswitch = findViewById(R.id.fab_appswitch);
 
         if (fabToggle == null || floatingPanel == null) return;
 
-        // メニュー開閉
-        fabToggle.setOnClickListener(v -> {
-            if (floatingPanel.getVisibility() == View.VISIBLE) {
-                floatingPanel.setVisibility(View.GONE);
-                fabToggle.setAlpha(0.4f);
-            } else {
-                floatingPanel.setVisibility(View.VISIBLE);
-                fabToggle.setAlpha(0.9f);
-                updateRotateButton(fabRotate);
+        // ⚙ ボタンのドラッグ移動 + タップでメニュー開閉
+        final float[] downXY = new float[2];
+        final int[] origMargin = new int[2];
+        final boolean[] dragging = {false};
+        fabToggle.setOnTouchListener((v, event) -> {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) v.getLayoutParams();
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downXY[0] = event.getRawX();
+                    downXY[1] = event.getRawY();
+                    origMargin[0] = lp.rightMargin;
+                    origMargin[1] = lp.bottomMargin;
+                    dragging[0] = false;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx = event.getRawX() - downXY[0];
+                    float dy = event.getRawY() - downXY[1];
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        dragging[0] = true;
+                    }
+                    if (dragging[0]) {
+                        lp.rightMargin = (int) (origMargin[0] - dx);
+                        lp.bottomMargin = (int) (origMargin[1] - dy);
+                        v.setLayoutParams(lp);
+                        // パネルも追従
+                        FrameLayout.LayoutParams plp = (FrameLayout.LayoutParams) floatingPanel.getLayoutParams();
+                        plp.rightMargin = lp.rightMargin;
+                        plp.bottomMargin = lp.bottomMargin + v.getHeight() + 8;
+                        floatingPanel.setLayoutParams(plp);
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!dragging[0]) {
+                        // タップ：メニュー開閉
+                        if (floatingPanel.getVisibility() == View.VISIBLE) {
+                            floatingPanel.setVisibility(View.GONE);
+                            fabToggle.setAlpha(0.4f);
+                        } else {
+                            floatingPanel.setVisibility(View.VISIBLE);
+                            fabToggle.setAlpha(0.9f);
+                        }
+                    }
+                    return true;
             }
+            return false;
         });
 
-        // 縦横切り替え
-        fabRotate.setOnClickListener(v -> {
-            toggleForcePortrait();
-            updateRotateButton(fabRotate);
+        // 切断ボタン
+        fabDisconnect.setOnClickListener(v -> {
+            showMainView(true);
+            first_time = true;
         });
 
         // 戻る / ホーム / タスクリスト
-        if (!PreUtils.get(context, Constant.CONTROL_NO, false)) {
-            fabBack.setOnClickListener(v -> {
-                if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_BACK);
-            });
-            fabHome.setOnClickListener(v -> {
-                if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_HOME);
-            });
-            fabAppswitch.setOnClickListener(v -> {
-                if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_APP_SWITCH);
-            });
-        } else {
-            fabBack.setVisibility(View.GONE);
-            fabHome.setVisibility(View.GONE);
-            fabAppswitch.setVisibility(View.GONE);
-        }
-    }
-
-    private void updateRotateButton(Button button) {
-        if (forcePortrait) {
-            button.setText(R.string.fab_rotate_portrait);
-        } else {
-            button.setText(R.string.fab_rotate_landscape);
-        }
+        fabBack.setOnClickListener(v -> {
+            if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_BACK);
+        });
+        fabHome.setOnClickListener(v -> {
+            if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_HOME);
+        });
+        fabAppswitch.setOnClickListener(v -> {
+            if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_APP_SWITCH);
+        });
     }
 
 

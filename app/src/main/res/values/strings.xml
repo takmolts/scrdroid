@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">scrdroid</string>
 
-    <string name="label_server_ip">Remote Device IP address, For example: 192.168.0.73</string>
+    <string name="label_server_ip">Remote Device IP address</string>
     <string name="label_video_resolution">Resolution</string>
     <string name="delay_control">Delay Control</string>
     <string name="label_video_bitrate">Bitrate</string>
@@ -12,9 +12,7 @@
     <string name="back_button">\u003C</string>
     <string name="switch_force_portrait">Force portrait (lock vertical display)</string>
     <string name="fab_menu_icon">&#x2699;</string>
-    <string name="fab_rotate_portrait">&#x21C5; Portrait</string>
-    <string name="fab_rotate_landscape">&#x21C4; Landscape</string>
-    <string name="fab_rotate">&#x21C5; Rotate</string>
+    <string name="fab_disconnect">&#x2716; Disconnect</string>
     <string name="fab_back">&#x25C1; Back</string>
     <string name="fab_home">&#x25CB; Home</string>
     <string name="fab_appswitch">&#x25A1; Tasks</string>
