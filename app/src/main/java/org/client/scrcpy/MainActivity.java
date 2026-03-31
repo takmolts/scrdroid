@@ -274,6 +274,12 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             connectScrcpyServer(serverAdr);
         });
 
+        final Button helpButton = findViewById(R.id.button_help);
+        if (helpButton != null) {
+            helpButton.setOnClickListener(v ->
+                    startActivity(new Intent(this, HelpActivity.class)));
+        }
+
 //        floatButton.setOnClickListener(v -> {
 //            getAttributes();
 //            showDisplayWindow();

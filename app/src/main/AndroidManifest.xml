@@ -21,6 +21,10 @@
             android:enabled="true"
             android:exported="true"></service>
         <service android:name=".FloatService" />
+
+        <activity
+            android:name=".HelpActivity"
+            android:theme="@style/AppTheme" />
     </application>
 
 </manifest>
