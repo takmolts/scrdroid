@@ -86,6 +86,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     private Surface surface;
     private Scrcpy scrcpy;
     private long timestamp = 0;
+    private int autoDisconnectMinutes = 0;
+    private android.os.Handler autoDisconnectHandler;
+    private Runnable autoDisconnectRunnable;
 
     // private byte[] fileBase64;
     private LinearLayout linearLayout;
@@ -147,6 +150,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     // userDisconnect ：是否为用户手动断开连接
     private void showMainView(boolean userDisconnect) {
+        stopAutoDisconnectTimer();
         if (scrcpy != null) {
             scrcpy.StopService();
         }
@@ -353,6 +357,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         setSpinner(R.array.options_resolution_values, R.id.spinner_video_resolution, Constant.PREFERENCE_SPINNER_RESOLUTION);
         setSpinner(R.array.options_bitrate_keys, R.id.spinner_video_bitrate, Constant.PREFERENCE_SPINNER_BITRATE);
         setSpinner(R.array.options_delay_keys, R.id.delay_control_spinner, Constant.PREFERENCE_SPINNER_DELAY);
+        setSpinner(R.array.options_auto_disconnect_keys, R.id.auto_disconnect_spinner, Constant.PREFERENCE_SPINNER_AUTO_DISCONNECT);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -468,6 +473,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         screenWidth = Integer.parseInt(videoResolutions[1]);
         videoBitrate = getResources().getIntArray(R.array.options_bitrate_values)[videoBitrateSpinner.getSelectedItemPosition()];
         delayControl = getResources().getIntArray(R.array.options_delay_values)[delayControlSpinner.getSelectedItemPosition()];
+        final Spinner autoDisconnectSpinner = findViewById(R.id.auto_disconnect_spinner);
+        autoDisconnectMinutes = getResources().getIntArray(R.array.options_auto_disconnect_values)[autoDisconnectSpinner.getSelectedItemPosition()];
     }
 
     private String[] getHistoryList() {
@@ -879,6 +886,29 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
      */
     protected void connectSuccessExt() {
         Dialog.closeDialogs();
+        startAutoDisconnectTimer();
+    }
+
+    private void startAutoDisconnectTimer() {
+        stopAutoDisconnectTimer();
+        if (autoDisconnectMinutes <= 0) return;
+        autoDisconnectHandler = new android.os.Handler(getMainLooper());
+        autoDisconnectRunnable = () -> {
+            if (serviceBound) {
+                Toast.makeText(context, "Auto disconnect (" + autoDisconnectMinutes + " min)", Toast.LENGTH_SHORT).show();
+                showMainView(true);
+                first_time = true;
+            }
+        };
+        autoDisconnectHandler.postDelayed(autoDisconnectRunnable, autoDisconnectMinutes * 60 * 1000L);
+    }
+
+    private void stopAutoDisconnectTimer() {
+        if (autoDisconnectHandler != null && autoDisconnectRunnable != null) {
+            autoDisconnectHandler.removeCallbacks(autoDisconnectRunnable);
+            autoDisconnectHandler = null;
+            autoDisconnectRunnable = null;
+        }
     }
 
     protected void connectExitExt() {

@@ -4,6 +4,7 @@
     <string name="label_server_ip">Remote Device IP address</string>
     <string name="label_video_resolution">Resolution</string>
     <string name="delay_control">Delay Control</string>
+    <string name="auto_disconnect">Auto Disconnect</string>
     <string name="label_video_bitrate">Bitrate</string>
     <string name="label_x">x</string>
     <string name="action_start">Start</string>
@@ -58,6 +59,24 @@
         <item>2 Mbps</item>
         <item>1 Mbps</item>
     </string-array>
+
+    <string-array name="options_auto_disconnect_keys">
+        <item>Unlimited</item>
+        <item>5 min</item>
+        <item>10 min</item>
+        <item>30 min</item>
+        <item>60 min</item>
+        <item>120 min</item>
+    </string-array>
+
+    <integer-array name="options_auto_disconnect_values">
+        <item>0</item>
+        <item>5</item>
+        <item>10</item>
+        <item>30</item>
+        <item>60</item>
+        <item>120</item>
+    </integer-array>
 
     <integer-array name="options_bitrate_values">
         <item>6144000</item>

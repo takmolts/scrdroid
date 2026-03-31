@@ -4,6 +4,15 @@
   <string name="label_server_ip">リモートデバイス IP アドレス</string>
   <string name="label_video_resolution">解像度</string>
   <string name="delay_control">遅延コントロール</string>
+  <string name="auto_disconnect">自動切断</string>
+  <string-array name="options_auto_disconnect_keys">
+    <item>無制限</item>
+    <item>5分</item>
+    <item>10分</item>
+    <item>30分</item>
+    <item>60分</item>
+    <item>120分</item>
+  </string-array>
   <string name="label_video_bitrate">ビットレート</string>
   <string name="label_x">x</string>
   <string name="action_start">開始</string>

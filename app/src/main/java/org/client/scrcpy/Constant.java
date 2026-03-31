@@ -10,6 +10,7 @@ public class Constant {
     public static final String PREFERENCE_SPINNER_BITRATE = "spinner_bitrate";
 
     public static final String PREFERENCE_SPINNER_DELAY = "delay_control";
+    public static final String PREFERENCE_SPINNER_AUTO_DISCONNECT = "auto_disconnect";
 
     public static final String CONTROL_FORCE_PORTRAIT = "force_portrait";
     public static final String HISTORY_LIST_KEY = "history_list_key";
