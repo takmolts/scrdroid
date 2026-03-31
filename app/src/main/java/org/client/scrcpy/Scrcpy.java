@@ -167,29 +167,36 @@ public class Scrcpy extends Service {
 
         int actionIndex = touch_event.getActionIndex();
         int pointerId = touch_event.getPointerId(actionIndex);
-        int pointCount = touch_event.getPointerCount();
-        // Log.e("Scrcpy", "pointer id: " + pointerId + " , action: " + touch_event.getAction() + " ,point count: " + pointCount + " x: " + touch_event.getX() + " y: " + touch_event.getY());
+        int maskedAction = touch_event.getActionMasked();
+        int pointerCount = touch_event.getPointerCount();
 
-        switch (touch_event.getAction()) {
-            case MotionEvent.ACTION_MOVE: // 所有手指移动
-                // 遍历所有触摸点，使用 pointerId 和 pointerIndex 来获取所有触摸点的信息
-                for (int i = 0; i < touch_event.getPointerCount(); i++) {
+        Log.d("ScrcpyTouch", "action=" + maskedAction + " actionIndex=" + actionIndex
+                + " pointerId=" + pointerId + " pointerCount=" + pointerCount
+                + " rawAction=0x" + Integer.toHexString(touch_event.getAction()));
+
+        switch (maskedAction) {
+            case MotionEvent.ACTION_MOVE:
+                for (int i = 0; i < pointerCount; i++) {
                     int currentPointerId = touch_event.getPointerId(i);
                     int x = (int) touch_event.getX(i);
                     int y = (int) touch_event.getY(i);
-                    // 处理每一个触摸点的x, y坐标
-                    // Log.e("Scrcpy", "触摸移动，index : " + i + " ,x : " + x + " , y: " + y + " ,currentPointerId: " + currentPointerId);
-                    sendTouchEvent(touch_event.getAction(), touch_event.getButtonState(), (int) (x * realW / displayW), (int) (y * realH / displayH), currentPointerId);
+                    sendTouchEvent(MotionEvent.ACTION_MOVE, touch_event.getButtonState(), (int) (x * realW / displayW), (int) (y * realH / displayH), currentPointerId);
                 }
                 break;
-            case MotionEvent.ACTION_POINTER_UP: // 中间手指抬起
-            case MotionEvent.ACTION_UP: // 最后一个手指抬起
-            case MotionEvent.ACTION_DOWN: // 第一个手指按下
-            case MotionEvent.ACTION_POINTER_DOWN: // 中间的手指按下
-            default:
-                sendTouchEvent(touch_event.getAction(), touch_event.getButtonState(), (int) (touch_event.getX() * realW / displayW), (int) (touch_event.getY() * realH / displayH), pointerId);
+            case MotionEvent.ACTION_CANCEL:
+                Log.w("ScrcpyTouch", "ACTION_CANCEL received, sending UP for pointerId=" + pointerId);
+                sendTouchEvent(MotionEvent.ACTION_UP, touch_event.getButtonState(), (int) (touch_event.getX(actionIndex) * realW / displayW), (int) (touch_event.getY(actionIndex) * realH / displayH), pointerId);
                 break;
-
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN:
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP:
+            default:
+                Log.d("ScrcpyTouch", "send: maskedAction=" + maskedAction + " pointerId=" + pointerId
+                        + " x=" + (int)(touch_event.getX(actionIndex) * realW / displayW)
+                        + " y=" + (int)(touch_event.getY(actionIndex) * realH / displayH));
+                sendTouchEvent(maskedAction, touch_event.getButtonState(), (int) (touch_event.getX(actionIndex) * realW / displayW), (int) (touch_event.getY(actionIndex) * realH / displayH), pointerId);
+                break;
         }
         return true;
     }

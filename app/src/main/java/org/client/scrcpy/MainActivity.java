@@ -422,7 +422,100 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             // 強制縦表示時はremoteLandscapeをタッチマッピングに渡す
             final boolean touchLandscape = forcePortrait ? remoteLandscape : landscape;
             surfaceView.setOnTouchListener((view, event) -> scrcpy.touchevent(event, touchLandscape, surfaceView.getWidth(), surfaceView.getHeight()));
+        } else {
+            // ビューイングモード：ピンチズーム＆パン（container ごと拡大して黒帯も含める）
+            setupPinchZoom(surfaceView, linearLayout);
         }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private void setupPinchZoom(final SurfaceView sv, final View zoomTarget) {
+        final float[] scaleFactor = {1.0f};
+        final float[] panX = {0f};
+        final float[] panY = {0f};
+        final float[] lastTouchX = {0f};
+        final float[] lastTouchY = {0f};
+        final boolean[] isPanning = {false};
+        final int[] activePointerId = {-1};
+
+        final android.view.ScaleGestureDetector scaleDetector =
+                new android.view.ScaleGestureDetector(context, new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override
+                    public boolean onScale(android.view.ScaleGestureDetector detector) {
+                        scaleFactor[0] *= detector.getScaleFactor();
+                        scaleFactor[0] = Math.max(1.0f, Math.min(scaleFactor[0], 5.0f));
+                        zoomTarget.setScaleX(scaleFactor[0]);
+                        zoomTarget.setScaleY(scaleFactor[0]);
+                        return true;
+                    }
+                });
+
+        final android.view.GestureDetector gestureDetector =
+                new android.view.GestureDetector(context, new android.view.GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDoubleTap(MotionEvent e) {
+                        // ダブルタップでリセット
+                        scaleFactor[0] = 1.0f;
+                        panX[0] = 0f;
+                        panY[0] = 0f;
+                        zoomTarget.setScaleX(1.0f);
+                        zoomTarget.setScaleY(1.0f);
+                        zoomTarget.setTranslationX(0f);
+                        zoomTarget.setTranslationY(0f);
+                        return true;
+                    }
+                });
+
+        sv.setOnTouchListener((view, event) -> {
+            scaleDetector.onTouchEvent(event);
+            gestureDetector.onTouchEvent(event);
+
+            // ズーム中のみパン操作
+            if (scaleFactor[0] > 1.01f) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        activePointerId[0] = event.getPointerId(0);
+                        lastTouchX[0] = event.getX();
+                        lastTouchY[0] = event.getY();
+                        isPanning[0] = false;
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        if (!scaleDetector.isInProgress() && activePointerId[0] != -1) {
+                            int idx = event.findPointerIndex(activePointerId[0]);
+                            if (idx >= 0) {
+                                float dx = event.getX(idx) - lastTouchX[0];
+                                float dy = event.getY(idx) - lastTouchY[0];
+                                if (isPanning[0] || Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                                    isPanning[0] = true;
+                                    panX[0] += dx;
+                                    panY[0] += dy;
+                                    zoomTarget.setTranslationX(panX[0]);
+                                    zoomTarget.setTranslationY(panY[0]);
+                                    lastTouchX[0] = event.getX(idx);
+                                    lastTouchY[0] = event.getY(idx);
+                                }
+                            }
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        activePointerId[0] = -1;
+                        break;
+                    case MotionEvent.ACTION_POINTER_UP:
+                        int upIdx = event.getActionIndex();
+                        if (event.getPointerId(upIdx) == activePointerId[0]) {
+                            int newIdx = (upIdx == 0) ? 1 : 0;
+                            if (newIdx < event.getPointerCount()) {
+                                activePointerId[0] = event.getPointerId(newIdx);
+                                lastTouchX[0] = event.getX(newIdx);
+                                lastTouchY[0] = event.getY(newIdx);
+                            }
+                        }
+                        break;
+                }
+            }
+            return true;
+        });
     }
 
     private void setSpinner(final int textArrayOptionResId, final int textViewResId, final String preferenceId) {
