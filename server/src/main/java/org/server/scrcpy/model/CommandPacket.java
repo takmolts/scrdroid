@@ -74,7 +74,8 @@ public class CommandPacket extends MediaPacket<CommandPacket> {
 
     public enum CmdType {
 
-        JSON_EXTRA_CMD((byte) 0), VIDEO_NEW_KEY_FRAME((byte) 1);
+        JSON_EXTRA_CMD((byte) 0), VIDEO_NEW_KEY_FRAME((byte) 1),
+        SCREEN_ON((byte) 2), SCREEN_OFF((byte) 3);
 
         private byte type;
 

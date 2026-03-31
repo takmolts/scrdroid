@@ -142,6 +142,16 @@ public class EventController {
             case VIDEO_NEW_KEY_FRAME:
                 screenEncoder.asyncRequestKeyFrame();
                 break;
+            case SCREEN_ON:
+                if (!device.isScreenOn()) {
+                    injectKeycode(KeyEvent.KEYCODE_POWER);
+                }
+                break;
+            case SCREEN_OFF:
+                if (device.isScreenOn()) {
+                    injectKeycode(KeyEvent.KEYCODE_POWER);
+                }
+                break;
         }
     }
 

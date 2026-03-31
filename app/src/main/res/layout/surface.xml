@@ -50,12 +50,21 @@
         tools:visibility="visible">
 
         <Button
-            android:id="@+id/fab_disconnect"
+            android:id="@+id/fab_screen_off"
             style="?android:attr/buttonBarButtonStyle"
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:text="@string/fab_disconnect"
-            android:textColor="#FFFF6666"
+            android:text="@string/fab_screen_off"
+            android:textColor="@android:color/white"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/fab_mute"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="@string/fab_mute_off"
+            android:textColor="@android:color/white"
             android:textSize="13sp" />
 
         <Button
@@ -83,6 +92,15 @@
             android:layout_height="44dp"
             android:text="@string/fab_appswitch"
             android:textColor="@android:color/white"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/fab_disconnect"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="@string/fab_disconnect"
+            android:textColor="#FFFF6666"
             android:textSize="13sp" />
 
     </LinearLayout>

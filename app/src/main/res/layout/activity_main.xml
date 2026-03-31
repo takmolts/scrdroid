@@ -1,301 +1,299 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#1D2228"
     android:orientation="vertical">
 
+    <!-- Header (compact) -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_gravity="top"
+        android:layout_height="40dp"
         android:background="#3C93F0">
 
         <TextView
             android:layout_width="wrap_content"
-            android:layout_height="80dp"
+            android:layout_height="match_parent"
             android:layout_gravity="start|center_vertical"
-            android:layout_marginLeft="10dp"
+            android:layout_marginLeft="12dp"
             android:gravity="center_vertical"
-            android:padding="20dp"
             android:text="@string/app_name"
-            android:textColor="@color/white" />
+            android:textColor="@color/white"
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/version_text"
             android:layout_width="wrap_content"
-            android:layout_height="80dp"
+            android:layout_height="match_parent"
             android:layout_gravity="end|center_vertical"
-            android:layout_marginRight="10dp"
+            android:layout_marginRight="12dp"
             android:gravity="center_vertical"
-            android:padding="20dp"
             android:textColor="#B0FFFFFF"
-            android:textSize="12sp" />
-
+            android:textSize="11sp" />
     </FrameLayout>
 
-
+    <!-- Main content area (scrollable, weight=1 to push button to bottom) -->
     <ScrollView
         android:id="@+id/main_scroll_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="top"
-        android:layout_marginTop="80dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginRight="20dp"
-            android:background="#1D2228"
-
             android:orientation="vertical"
+            android:paddingLeft="8dp"
+            android:paddingTop="6dp"
+            android:paddingRight="8dp"
             tools:context=".MainActivity">
 
+            <!-- IP Address -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="5dp"
-                android:layout_marginRight="10dp"
                 android:background="#323540"
                 android:orientation="vertical"
-                android:paddingLeft="10dp"
-                android:paddingTop="5dp"
-                android:paddingRight="10dp"
-                android:paddingBottom="5dp">
+                android:padding="8dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingTop="5dp"
                     android:text="@string/label_server_ip"
-                    android:textAppearance="@android:style/TextAppearance"
-                    android:textColor="@color/white" />
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_marginTop="10dp"
-                    android:layout_marginRight="20dp"
-                    android:background="@drawable/edit_background"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
                     <EditText
                         android:id="@+id/editText_server_host"
                         android:layout_width="0dp"
-                        android:layout_height="match_parent"
+                        android:layout_height="38dp"
                         android:layout_weight="1"
-                        android:background="@null"
+                        android:background="@drawable/edit_background"
                         android:gravity="center"
                         android:importantForAutofill="no"
                         android:inputType="text"
-                        android:minHeight="50dp"
-                        android:paddingLeft="5dp"
-                        android:paddingRight="5dp"
+                        android:paddingLeft="8dp"
+                        android:paddingRight="8dp"
                         android:textColor="@color/white"
                         android:textColorHint="#A8AAB5"
+                        android:textSize="14sp"
                         tools:ignore="LabelFor,SpeakableTextPresentCheck" />
 
                     <FrameLayout
                         android:id="@+id/history_list"
-                        android:layout_width="40dp"
-                        android:layout_height="50dp"
-                        android:layout_gravity="center_vertical"
-                        android:layout_margin="2dp"
+                        android:layout_width="36dp"
+                        android:layout_height="38dp"
+                        android:layout_marginLeft="4dp"
                         android:background="@drawable/btn_selector">
 
                         <ImageView
-                            android:layout_width="15dp"
-                            android:layout_height="15dp"
+                            android:layout_width="12dp"
+                            android:layout_height="12dp"
                             android:layout_gravity="center"
                             android:src="@drawable/down" />
                     </FrameLayout>
+                </LinearLayout>
+            </LinearLayout>
 
+            <!-- Row 1: Resolution / Bitrate -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginRight="2dp"
+                    android:background="#323540"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/label_video_resolution"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+
+                    <Spinner
+                        android:id="@+id/spinner_video_resolution"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:entries="@array/options_resolution_values"
+                        android:textColor="@color/white"
+                        tools:ignore="DuplicateSpeakableTextCheck" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginLeft="2dp"
+                    android:background="#323540"
+                    android:orientation="vertical"
+                    android:padding="8dp">
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/label_video_bitrate"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+
+                    <Spinner
+                        android:id="@+id/spinner_video_bitrate"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:entries="@array/options_bitrate_keys"
+                        android:textColor="@color/white" />
+                </LinearLayout>
             </LinearLayout>
 
-
+            <!-- Row 2: Delay / Auto-disconnect -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginRight="2dp"
+                    android:background="#323540"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/delay_control"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+
+                    <Spinner
+                        android:id="@+id/delay_control_spinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:entries="@array/options_delay_keys"
+                        android:textColor="@color/white"
+                        tools:ignore="DuplicateSpeakableTextCheck" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginLeft="2dp"
+                    android:background="#323540"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/auto_disconnect"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+
+                    <Spinner
+                        android:id="@+id/auto_disconnect_spinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:entries="@array/options_auto_disconnect_keys"
+                        android:textColor="@color/white" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Row 3: Screen control / (reserved) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:background="#323540"
                 android:orientation="vertical"
-                android:paddingLeft="10dp"
-                android:paddingTop="5dp"
-                android:paddingRight="10dp">
+                android:padding="8dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/label_video_resolution"
-                    android:textAppearance="@android:style/TextAppearance"
+                    android:text="@string/screen_control"
                     android:textColor="@color/white"
-                    android:textSize="16sp" />
+                    android:textSize="12sp" />
 
                 <Spinner
-                    android:id="@+id/spinner_video_resolution"
+                    android:id="@+id/screen_control_spinner"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_marginRight="20dp"
-                    android:entries="@array/options_resolution_values"
-                    android:minHeight="48dp"
-                    android:textColor="@color/white"
-                    tools:ignore="DuplicateSpeakableTextCheck" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
-                android:background="#323540"
-                android:orientation="vertical"
-                android:paddingLeft="10dp"
-                android:paddingTop="5dp"
-                android:paddingRight="10dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/label_video_bitrate"
-                    android:textAppearance="@android:style/TextAppearance"
+                    android:layout_height="36dp"
+                    android:entries="@array/options_screen_control_keys"
                     android:textColor="@color/white" />
-
-                <Spinner
-                    android:id="@+id/spinner_video_bitrate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_marginRight="20dp"
-                    android:entries="@array/options_bitrate_keys"
-                    android:minHeight="48dp"
-                    android:textColor="@color/white" />
-
             </LinearLayout>
 
+            <!-- Switches row -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
-                android:background="#323540"
-                android:orientation="vertical"
-                android:paddingLeft="10dp"
-                android:paddingTop="5dp"
-                android:paddingRight="10dp">
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/delay_control"
-                    android:textAppearance="@android:style/TextAppearance"
+                <Switch
+                    android:id="@+id/switch0"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginRight="2dp"
+                    android:background="#323540"
+                    android:gravity="center_vertical"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/switch0"
                     android:textColor="@color/white"
-                    android:textSize="16sp" />
+                    android:textSize="11sp" />
 
-                <Spinner
-                    android:id="@+id/delay_control_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_marginRight="20dp"
-                    android:entries="@array/options_delay_keys"
-                    android:minHeight="48dp"
+                <Switch
+                    android:id="@+id/switch_force_portrait"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginLeft="2dp"
+                    android:background="#323540"
+                    android:gravity="center_vertical"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/switch_force_portrait"
                     android:textColor="@color/white"
-                    tools:ignore="DuplicateSpeakableTextCheck" />
-
+                    android:textSize="11sp" />
             </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
-                android:background="#323540"
-                android:orientation="vertical"
-                android:paddingLeft="10dp"
-                android:paddingTop="5dp"
-                android:paddingRight="10dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/auto_disconnect"
-                    android:textAppearance="@android:style/TextAppearance"
-                    android:textColor="@color/white"
-                    android:textSize="16sp" />
-
-                <Spinner
-                    android:id="@+id/auto_disconnect_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_marginRight="20dp"
-                    android:entries="@array/options_auto_disconnect_keys"
-                    android:minHeight="48dp"
-                    android:textColor="@color/white" />
-
-            </LinearLayout>
-
-            <Switch
-                android:id="@+id/switch0"
-                android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
-                android:layout_weight="1"
-                android:background="#323540"
-                android:gravity="center_vertical"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:text="@string/switch0"
-                android:textColor="@color/white"
-                android:textSize="15sp" />
-
-            <Switch
-                android:id="@+id/switch_force_portrait"
-                android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
-                android:layout_weight="1"
-                android:background="#323540"
-                android:gravity="center_vertical"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:text="@string/switch_force_portrait"
-                android:textColor="@color/white"
-                android:textSize="15sp" />
-
-
-            <Button
-                android:id="@+id/button_start"
-                android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_marginLeft="10dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginRight="10dp"
-                android:layout_marginBottom="20dp"
-                android:layout_weight="1"
-                android:background="@drawable/btn_selector"
-                android:text="@string/action_start"
-                android:textColor="@color/white"
-                android:textSize="16sp" />
         </LinearLayout>
     </ScrollView>
-</FrameLayout>
+
+    <!-- Start button (fixed at bottom) -->
+    <Button
+        android:id="@+id/button_start"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="#3C93F0"
+        android:text="@string/action_start"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

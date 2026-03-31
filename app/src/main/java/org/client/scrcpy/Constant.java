@@ -13,6 +13,7 @@ public class Constant {
     public static final String PREFERENCE_SPINNER_AUTO_DISCONNECT = "auto_disconnect";
 
     public static final String CONTROL_FORCE_PORTRAIT = "force_portrait";
+    public static final String PREFERENCE_SPINNER_SCREEN_CONTROL = "screen_control";
     public static final String HISTORY_LIST_KEY = "history_list_key";
     public static final String USER_ID = "user_id";
 

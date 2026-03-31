@@ -52,6 +52,23 @@ public class AudioDecoder {
         }
     }
 
+    private boolean muted = false;
+
+    public void setMuted(boolean muted) {
+        this.muted = muted;
+        if (audioTrack != null) {
+            if (muted) {
+                audioTrack.setStereoVolume(0f, 0f);
+            } else {
+                audioTrack.setStereoVolume(1f, 1f);
+            }
+        }
+    }
+
+    public boolean isMuted() {
+        return muted;
+    }
+
     public void stop() {
         if (mWorker != null) {
             mWorker.setRunning(false);

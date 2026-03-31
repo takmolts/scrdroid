@@ -12,8 +12,17 @@
     <string name="home_button">o</string>
     <string name="back_button">\u003C</string>
     <string name="switch_force_portrait">Force portrait (lock vertical display)</string>
+    <string name="screen_control">Screen on connect</string>
+    <string-array name="options_screen_control_keys">
+        <item>No action</item>
+        <item>Turn ON</item>
+        <item>Turn OFF</item>
+    </string-array>
     <string name="fab_menu_icon">&#x2699;</string>
     <string name="fab_disconnect">&#x2716; Disconnect</string>
+    <string name="fab_mute_on">&#x1F507; Mute</string>
+    <string name="fab_mute_off">&#x1F50A; Sound</string>
+    <string name="fab_screen_off">&#x1F4F4; Screen OFF</string>
     <string name="fab_back">&#x25C1; Back</string>
     <string name="fab_home">&#x25CB; Home</string>
     <string name="fab_appswitch">&#x25A1; Tasks</string>

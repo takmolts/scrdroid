@@ -220,6 +220,34 @@ public class Scrcpy extends Service {
         return socket_status;
     }
 
+    public void setAudioMuted(boolean muted) {
+        if (audioDecoder != null) {
+            audioDecoder.setMuted(muted);
+        }
+    }
+
+    public boolean isAudioMuted() {
+        return audioDecoder != null && audioDecoder.isMuted();
+    }
+
+    public void sendScreenOn() {
+        sendCommand(CommandPacket.CmdType.SCREEN_ON);
+    }
+
+    public void sendScreenOff() {
+        sendCommand(CommandPacket.CmdType.SCREEN_OFF);
+    }
+
+    private void sendCommand(CommandPacket.CmdType cmdType) {
+        if (LetServceRunning.get() && socketOutputStream != null) {
+            try {
+                socketOutputStream.write(CommandPacket.toArray(MediaPacket.Type.COMMAND, cmdType, new byte[0]));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     public void sendKeyevent(int keycode) {
         // サーバー側は buffer[2]==0 && buffer[3]==0 でキーイベントを判定するため、
         // タッチイベントと同じ5要素フォーマットで送る (keycode, 0, x=0, y=0, pointerId=0)
