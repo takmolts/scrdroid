@@ -45,6 +45,7 @@ public class Scrcpy extends Service {
     private int screenHeight;
 
     private final Queue<byte[]> event = new LinkedList<byte[]>();
+    private final Queue<CommandPacket.CmdType> pendingCommands = new LinkedList<>();
     // private byte[] event = null;
     private VideoDecoder videoDecoder;
     private AudioDecoder audioDecoder;
@@ -124,11 +125,8 @@ public class Scrcpy extends Service {
         }
         updateAvailable.set(true);
 
-        try {  // 请求关键帧, 避免花屏
-            requestNewKeyFrame();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // 请求关键帧, 避免花屏（キュー経由で送信）
+        pendingCommands.offer(CommandPacket.CmdType.VIDEO_NEW_KEY_FRAME);
     }
 
     public void StopService() {
@@ -246,12 +244,9 @@ public class Scrcpy extends Service {
     }
 
     private void sendCommand(CommandPacket.CmdType cmdType) {
-        if (LetServceRunning.get() && socketOutputStream != null) {
-            try {
-                socketOutputStream.write(CommandPacket.toArray(MediaPacket.Type.COMMAND, cmdType, new byte[0]));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        if (LetServceRunning.get()) {
+            // コマンドキューに追加し、loop() のメインスレッドで送信する（スレッド安全）
+            pendingCommands.offer(cmdType);
         }
     }
 
@@ -435,6 +430,17 @@ public class Scrcpy extends Service {
                         LetServceRunning.set(false);
                     } finally {
                         // event = null;
+                    }
+                }
+
+                // コマンドキューの送信
+                CommandPacket.CmdType cmd = pendingCommands.poll();
+                if (cmd != null) {
+                    waitEvent = false;
+                    try {
+                        dataOutputStream.write(CommandPacket.toArray(MediaPacket.Type.COMMAND, cmd, new byte[0]));
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
 

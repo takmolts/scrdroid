@@ -66,7 +66,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     private boolean headlessMode = false;  // 是否为无头模式，不显示操作选项等
     private boolean forcePortrait = false; // 強制縦表示モード
-    private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF
+    // private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF (現在無効)
     private boolean remoteLandscape = false; // リモートが横向きかどうか（forcePortrait用）
     private int screenWidth;
     private int screenHeight;
@@ -361,7 +361,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         }
         aSwitch0.setChecked(PreUtils.get(context, Constant.CONTROL_NO, false));
         switchForcePortrait.setChecked(PreUtils.get(context, Constant.CONTROL_FORCE_PORTRAIT, false));
-        setSpinner(R.array.options_screen_control_keys, R.id.screen_control_spinner, Constant.PREFERENCE_SPINNER_SCREEN_CONTROL);
+        // setSpinner(R.array.options_screen_control_keys, R.id.screen_control_spinner, Constant.PREFERENCE_SPINNER_SCREEN_CONTROL);
         setSpinner(R.array.options_resolution_values, R.id.spinner_video_resolution, Constant.PREFERENCE_SPINNER_RESOLUTION);
         setSpinner(R.array.options_bitrate_keys, R.id.spinner_video_bitrate, Constant.PREFERENCE_SPINNER_BITRATE);
         setSpinner(R.array.options_delay_keys, R.id.delay_control_spinner, Constant.PREFERENCE_SPINNER_DELAY);
@@ -568,8 +568,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         forcePortrait = switchFP.isChecked();
         PreUtils.put(context, Constant.CONTROL_NO, no_control);
         PreUtils.put(context, Constant.CONTROL_FORCE_PORTRAIT, forcePortrait);
-        final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
-        screenControlMode = screenControlSpinner.getSelectedItemPosition();
+        // final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
+        // screenControlMode = screenControlSpinner.getSelectedItemPosition();
 
         final String[] videoResolutions = getResources().getStringArray(R.array.options_resolution_values)[videoResolutionSpinner.getSelectedItemPosition()].split("x");
         screenHeight = Integer.parseInt(videoResolutions[0]);
@@ -1010,14 +1010,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     protected void connectSuccessExt() {
         Dialog.closeDialogs();
         startAutoDisconnectTimer();
-        // 接続時の画面制御コマンド送信
-        if (scrcpy != null && screenControlMode > 0) {
-            if (screenControlMode == 1) {
-                scrcpy.sendScreenOn();
-            } else if (screenControlMode == 2) {
-                scrcpy.sendScreenOff();
-            }
-        }
+        // 接続時の画面制御コマンド送信（現在無効）
+        // if (scrcpy != null && screenControlMode > 0) { ... }
     }
 
     private void startAutoDisconnectTimer() {

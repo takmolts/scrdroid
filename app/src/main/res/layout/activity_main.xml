@@ -218,29 +218,6 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Row 3: Screen control / (reserved) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:background="#323540"
-                android:orientation="vertical"
-                android:padding="8dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/screen_control"
-                    android:textColor="@color/white"
-                    android:textSize="12sp" />
-
-                <Spinner
-                    android:id="@+id/screen_control_spinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:entries="@array/options_screen_control_keys"
-                    android:textColor="@color/white" />
-            </LinearLayout>
 
             <!-- Switches row -->
             <LinearLayout

@@ -46,10 +46,6 @@ public class HelpActivity extends Activity {
                 + "<p>設定した時間が経過すると<b>自動的に切断</b>してメイン画面に戻ります。</p>"
                 + "<p>バッテリーの消耗を防ぎたいときや、つけっぱなし防止に便利です。</p>"
 
-                + "<h3>接続時の画面</h3>"
-                + "<p>接続が確立した直後に、リモートデバイスの画面を自動で ON/OFF できます。</p>"
-                + "<p>「<b>OFF にする</b>」を選ぶと、相手の画面を消したままミラーリングだけ続けられるため、バッテリー節約になります。</p>"
-
                 + "<h3>強制縦画面表示</h3>"
                 + "<p>リモートデバイスが横画面でも、<b>縦表示のまま</b>レターボックス（上下黒帯）で表示します。</p>"
                 + "<p>縦持ちのまま横画面のアプリを確認したいときに便利です。</p>"
@@ -90,10 +86,6 @@ public class HelpActivity extends Activity {
                 + "<h3>Auto Disconnect</h3>"
                 + "<p>Automatically <b>disconnects</b> after the specified time and returns to the main screen.</p>"
                 + "<p>Useful for preventing battery drain or unattended sessions.</p>"
-
-                + "<h3>Screen on Connect</h3>"
-                + "<p>Automatically turns the remote device's screen ON or OFF when the connection is established.</p>"
-                + "<p>Selecting \"<b>Turn OFF</b>\" keeps the remote screen off while mirroring continues, saving battery.</p>"
 
                 + "<h3>Force Portrait</h3>"
                 + "<p>Displays the remote screen in <b>portrait mode</b> with letterboxing, even if the remote device is in landscape.</p>"
