@@ -380,10 +380,13 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 //        float this_dev_height = metrics.heightPixels;
 //        float this_dev_width = metrics.widthPixels;
 
-        // 前回のパディングをリセットしてから再計算
+        // パディングをリセットし、コンテナのフルサイズを使用
         linearLayout.setPadding(0, 0, 0, 0);
-        float this_dev_height = linearLayout.getHeight();
-        float this_dev_width = linearLayout.getWidth();
+        // パディングに依存せず、画面全体のサイズを基準に計算
+        DisplayMetrics dm = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getRealMetrics(dm);
+        float this_dev_height = dm.heightPixels;
+        float this_dev_width = dm.widthPixels;
         int[] rem_res = scrcpy.get_remote_device_resolution();
         int remote_device_height = rem_res[1];
         int remote_device_width = rem_res[0];
@@ -808,11 +811,12 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         if (forcePortrait) {
             // 強制縦表示モード：Activityの向きは変えず、リモートの向き状態だけ更新
             remoteLandscape = !remoteLandscape;
-            // UIスレッドでデコーダの再構成とレイアウト調整を行う
             runOnUiThread(() -> {
                 if (serviceBound && scrcpy != null && surface != null && linearLayout != null) {
                     scrcpy.setParms(surface, screenWidth, screenHeight);
-                    set_display_nd_touch();
+                    // パディングリセット後、レイアウト再測定を待ってからアスペクト比を再計算
+                    linearLayout.setPadding(0, 0, 0, 0);
+                    linearLayout.post(() -> set_display_nd_touch());
                 }
             });
             return;
