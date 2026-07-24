@@ -232,6 +232,11 @@ public class ScrcpyHost implements Scrcpy.ServiceCallbacks {
 
     }
 
+    @Override
+    public void onVideoSizeChanged(int width, int height) {
+        // フローティングウィンドウ側は固定サイズ表示のため何もしない
+    }
+
     public void destroy() {
         if (serviceBound) {
             scrcpy.StopService();

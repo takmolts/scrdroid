@@ -50,6 +50,15 @@
         tools:visibility="visible">
 
         <Button
+            android:id="@+id/fab_orientation"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="@string/fab_orientation_auto"
+            android:textColor="@android:color/white"
+            android:textSize="13sp" />
+
+        <Button
             android:id="@+id/fab_screen_off"
             style="?android:attr/buttonBarButtonStyle"
             android:layout_width="match_parent"

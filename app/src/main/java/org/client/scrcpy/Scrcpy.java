@@ -26,8 +26,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
@@ -44,8 +44,9 @@ public class Scrcpy extends Service {
     private int screenWidth;
     private int screenHeight;
 
-    private final Queue<byte[]> event = new LinkedList<byte[]>();
-    private final Queue<CommandPacket.CmdType> pendingCommands = new LinkedList<>();
+    // UI スレッドと通信スレッドの両方から触るためスレッドセーフなキューを使う
+    private final Queue<byte[]> event = new ConcurrentLinkedQueue<>();
+    private final Queue<CommandPacket.CmdType> pendingCommands = new ConcurrentLinkedQueue<>();
     // private byte[] event = null;
     private VideoDecoder videoDecoder;
     private AudioDecoder audioDecoder;
@@ -54,10 +55,15 @@ public class Scrcpy extends Service {
     private boolean first_time = true;
 
     private final AtomicBoolean LetServceRunning = new AtomicBoolean(true);
-    private ServiceCallbacks serviceCallbacks;
+    private volatile ServiceCallbacks serviceCallbacks;
     private final int[] remote_dev_resolution = new int[2];
-    private boolean socket_status = false;
+    private volatile boolean socket_status = false;
 
+    // デコーダが報告する実映像サイズ（向きの推測をやめ、これを唯一の基準にする）
+    private volatile int videoWidth = 0;
+    private volatile int videoHeight = 0;
+
+    private volatile Socket socket = null;
     private DataInputStream socketInputStream = null;
     private DataOutputStream socketOutputStream = null;
 
@@ -66,8 +72,33 @@ public class Scrcpy extends Service {
         return mBinder;
     }
 
+    @Override
+    public void onDestroy() {
+        // サービスが破棄されるときは必ず接続を止める
+        // （破棄されずにインスタンスが残ると LetServceRunning=false のまま再利用され、
+        //   次回の接続が一切開始されなくなる）
+        StopService();
+        serviceCallbacks = null;
+        super.onDestroy();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // タスク一覧からスワイプで消された場合もソケットを閉じる
+        StopService();
+        super.onTaskRemoved(rootIntent);
+    }
+
     public void setServiceCallbacks(ServiceCallbacks callbacks) {
         serviceCallbacks = callbacks;
+    }
+
+    public int getVideoWidth() {
+        return videoWidth;
+    }
+
+    public int getVideoHeight() {
+        return videoHeight;
     }
 
     public void setParms(Surface NewSurface, int NewWidth, int NewHeight) {
@@ -75,20 +106,29 @@ public class Scrcpy extends Service {
         this.screenHeight = NewHeight;
         this.surface = NewSurface;
 
-        videoDecoder.start();
-        audioDecoder.start();
-
+        if (videoDecoder != null) {
+            videoDecoder.start();
+        }
+        if (audioDecoder != null) {
+            audioDecoder.start();
+        }
 
         updateAvailable.set(true);
 
     }
 
     public void start(Surface surface, String serverAdr, int screenHeight, int screenWidth, int delay) {
-        this.videoDecoder = new VideoDecoder();
-        videoDecoder.start();
-
-        this.audioDecoder = new AudioDecoder();
-        audioDecoder.start();
+        // サービスは1プロセスに1インスタンスしか存在しないため、
+        // 前回の接続で false になった状態をここで必ず初期化する
+        stopDecoders();
+        LetServceRunning.set(true);
+        socket_status = false;
+        first_time = true;
+        videoWidth = 0;
+        videoHeight = 0;
+        updateAvailable.set(false);
+        event.clear();
+        pendingCommands.clear();
 
         String[] serverInfo = Util.getServerHostAndPort(serverAdr);
         this.serverHost = serverInfo[0];
@@ -97,6 +137,9 @@ public class Scrcpy extends Service {
         this.screenHeight = screenHeight;
         this.screenWidth = screenWidth;
         this.surface = surface;
+
+        createDecoders();
+
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -104,6 +147,36 @@ public class Scrcpy extends Service {
             }
         });
         thread.start();
+    }
+
+    /**
+     * デコーダを生成し直す。実映像サイズの通知経路もここで張る。
+     */
+    private void createDecoders() {
+        this.videoDecoder = new VideoDecoder();
+        this.videoDecoder.setSizeListener((width, height) -> {
+            videoWidth = width;
+            videoHeight = height;
+            ServiceCallbacks callbacks = serviceCallbacks;
+            if (callbacks != null) {
+                callbacks.onVideoSizeChanged(width, height);
+            }
+        });
+        this.videoDecoder.start();
+
+        this.audioDecoder = new AudioDecoder();
+        this.audioDecoder.start();
+    }
+
+    private void stopDecoders() {
+        // 参照は残す（通信スレッドが動作中に null になると NPE になるため）。
+        // 次回接続時は createDecoders() で作り直される
+        if (videoDecoder != null) {
+            videoDecoder.stop();
+        }
+        if (audioDecoder != null) {
+            audioDecoder.stop();
+        }
     }
 
     public void pause() {
@@ -131,13 +204,27 @@ public class Scrcpy extends Service {
 
     public void StopService() {
         LetServceRunning.set(false);
-        if (videoDecoder != null) {
-            videoDecoder.stop();
-        }
-        if (audioDecoder != null) {
-            audioDecoder.stop();
-        }
+        socket_status = false;
+        // ソケットを明示的に閉じて通信スレッドを即座に解放する。
+        // フラグだけでは read/connect でブロック中のスレッドが残り、
+        // リモート側のサーバープロセスも終了しない。
+        closeSocketQuietly();
+        stopDecoders();
+        event.clear();
+        pendingCommands.clear();
         stopSelf();
+    }
+
+    private void closeSocketQuietly() {
+        Socket current = socket;
+        socket = null;
+        if (current != null) {
+            try {
+                current.close();
+            } catch (IOException ignore) {
+                // 既に閉じている場合は無視
+            }
+        }
     }
 
 
@@ -147,8 +234,16 @@ public class Scrcpy extends Service {
         float realH;
         float realW;
 
-        // サーバーは Math.max(screenWidth, screenHeight) で起動されるため、
-        // 座標の上限値も同じ最大値を使う（forcePortrait でも正しくマッピングされる）
+        // サーバーは受信座標を deviceSize/videoSize で換算するため、
+        // クライアントは videoSize（＝デコーダの実出力サイズ）の座標系で送る必要がある。
+        // 実サイズが判明していればそれを使い、向きの推測を一切行わない。
+        if (videoWidth > 0 && videoHeight > 0) {
+            realW = videoWidth;
+            realH = videoHeight;
+            return sendTouchEvents(touch_event, realW, realH, displayW, displayH);
+        }
+
+        // 実サイズ未取得時（最初のフレーム到着前）のみ従来の推定値を使う
         int maxDim = Math.max(screenWidth, screenHeight);
         if (landscape) {  // 横屏的话，宽高相反
             remoteW = Math.max(remote_dev_resolution[0], remote_dev_resolution[1]);
@@ -163,6 +258,13 @@ public class Scrcpy extends Service {
             realW = realH * remoteW / remoteH;
         }
 
+        return sendTouchEvents(touch_event, realW, realH, displayW, displayH);
+    }
+
+    private boolean sendTouchEvents(MotionEvent touch_event, float realW, float realH, int displayW, int displayH) {
+        if (displayW <= 0 || displayH <= 0) {
+            return true;
+        }
         int actionIndex = touch_event.getActionIndex();
         int pointerId = touch_event.getPointerId(actionIndex);
         int maskedAction = touch_event.getActionMasked();
@@ -270,23 +372,18 @@ public class Scrcpy extends Service {
     }
 
     private void startConnection(String ip, int port, int delay) {
-
-        videoDecoder = new VideoDecoder();
-        videoDecoder.start();
-        audioDecoder = new AudioDecoder();
-        audioDecoder.start();
+        // デコーダは start() で生成済み（ここで作り直すとワーカースレッドが毎回リークする）
 
         DataInputStream dataInputStream = null;
         DataOutputStream dataOutputStream = null;
-        Socket socket = null;
         boolean firstConnect = true;
         int attempts = 50;
         while (attempts > 0 && LetServceRunning.get()) {
+            final Socket newSocket = new Socket();
+            socket = newSocket;
             try {
                 Log.e("Scrcpy", "Connecting to " + LOCAL_IP);
-                // socket = new Socket(ip, port);
-                socket = new Socket();
-                socket.connect(new InetSocketAddress(ip, port), 5000); //设置超时5000毫秒
+                newSocket.connect(new InetSocketAddress(ip, port), 5000); //设置超时5000毫秒
                 if (!LetServceRunning.get()) {
                     return;
                 }
@@ -300,7 +397,7 @@ public class Scrcpy extends Service {
                     // waitResolutionCount 为 10，等待100ms 也就是共计一秒钟，设置attempts 为 5，也就是 5秒后则退出
                     attempts = 5;
                 }
-                dataInputStream = new DataInputStream(socket.getInputStream());
+                dataInputStream = new DataInputStream(newSocket.getInputStream());
                 int waitResolutionCount = 10;
                 while (dataInputStream.available() <= 0 && waitResolutionCount > 0) {
                     waitResolutionCount--;
@@ -314,7 +411,7 @@ public class Scrcpy extends Service {
                 }
 
 
-                dataOutputStream = new DataOutputStream(socket.getOutputStream());
+                dataOutputStream = new DataOutputStream(newSocket.getOutputStream());
                 attempts = 0;
                 byte[] buf = new byte[16];
                 dataInputStream.read(buf, 0, 16);
@@ -345,8 +442,9 @@ public class Scrcpy extends Service {
                     if (attempts < 0) {
                         socket_status = false;
 
-                        if (serviceCallbacks != null) {
-                            serviceCallbacks.errorDisconnect();
+                        ServiceCallbacks callbacks = serviceCallbacks;
+                        if (callbacks != null) {
+                            callbacks.errorDisconnect();
                         }
                         return;
                     }
@@ -355,15 +453,17 @@ public class Scrcpy extends Service {
                     } catch (InterruptedException ignore) {
                     }
                 }
-                Log.e("Scrcpy", e.getMessage());
+                Log.e("Scrcpy", "connection error: " + e);
                 Log.e("Scrcpy", "attempts--");
             } finally {
-                if (socket != null) {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                socket_status = false;
+                try {
+                    newSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                if (socket == newSocket) {
+                    socket = null;
                 }
                 if (dataOutputStream != null) {
                     try {
@@ -460,7 +560,8 @@ public class Scrcpy extends Service {
                     if (MediaPacket.Type.getType(packet[0]) == MediaPacket.Type.VIDEO) {
                         VideoPacket videoPacket = VideoPacket.readHead(packet);
                         // byte[] data = videoPacket.data;
-                        if (videoPacket.flag == VideoPacket.Flag.CONFIG || updateAvailable.get()) {
+                        final boolean isConfigPacket = videoPacket.flag == VideoPacket.Flag.CONFIG;
+                        if (isConfigPacket || updateAvailable.get()) {
                             if (!updateAvailable.get()) {
                                 int dataLength = packet.length - videoPacket.headLength();
                                 byte[] data = new byte[dataLength];
@@ -484,6 +585,13 @@ public class Scrcpy extends Service {
                             updateAvailable.set(false);
                             if (streamSettings != null) {
                                 videoDecoder.configure(surface, screenWidth, screenHeight, streamSettings.sps, streamSettings.pps);
+                            }
+                            if (!isConfigPacket) {
+                                // CONFIG パケットを伴わない再構成（＝Surface 差し替えのみ）。
+                                // サーバー側はエンコーダを再起動しないため IDR が送られてこず、
+                                // 次の定期 I フレーム（10秒間隔）まで描画できない。
+                                // キーフレームを要求するだけで、フレームの取捨選択やタイミング判定には触れない
+                                pendingCommands.offer(CommandPacket.CmdType.VIDEO_NEW_KEY_FRAME);
                             }
                         } else if (videoPacket.flag == VideoPacket.Flag.END) {
                             // need close stream
@@ -537,6 +645,10 @@ public class Scrcpy extends Service {
             } catch (IOException e) {
                 Log.e("Scrcpy", "IOException: " + e.getMessage());
                 e.printStackTrace();
+            } catch (IllegalStateException e) {
+                // デコーダ側の一時的な不整合（Surface 破棄との競合など）。
+                // 接続は維持し、次の CONFIG での再構成を待つ
+                Log.w("Scrcpy", "decoder error, keep connection: " + e);
             } finally {
                 if (waitEvent) {
                     Thread.sleep(5);
@@ -549,6 +661,12 @@ public class Scrcpy extends Service {
         void loadNewRotation();
 
         void errorDisconnect();
+
+        /**
+         * デコーダが実映像サイズを確定／変更したときに通知される。
+         * 呼び出しはデコーダのワーカースレッドから行われる。
+         */
+        void onVideoSizeChanged(int width, int height);
     }
 
     public class MyServiceBinder extends Binder {

@@ -22,13 +22,11 @@ import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -64,16 +62,22 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     // 是否直接连接远程
     public final static String START_REMOTE = "start_remote_headless";
 
+    // 表示方向モード
+    public static final int ORIENT_AUTO = 0;      // サーバー（リモート）の向きに追従
+    public static final int ORIENT_PORTRAIT = 1;  // 縦固定
+    public static final int ORIENT_LANDSCAPE = 2; // 横固定
+
     private boolean headlessMode = false;  // 是否为无头模式，不显示操作选项等
-    private boolean forcePortrait = false; // 強制縦表示モード
+    private int orientationMode = ORIENT_AUTO; // 表示方向モード
     // private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF (現在無効)
-    private boolean remoteLandscape = false; // リモートが横向きかどうか（forcePortrait用）
     private int screenWidth;
     private int screenHeight;
     private boolean landscape = false;
     private boolean first_time = true;
     private boolean result_of_Rotation = false;
     private boolean serviceBound = false;
+    // bindService を発行済みかどうか（未バインド状態での unbind を避ける）
+    private boolean serviceBindRequested = false;
     // 如果 pause 切换到后台，断开后，自动重连
     // 该状态禁止保存恢复
     private boolean resumeScrcpy = false;
@@ -149,18 +153,40 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         showMainView(false);
     }
 
+    /**
+     * Scrcpy サービスを確実に破棄する。
+     * Service はプロセス内で単一インスタンスのため、ここで破棄し切らないと
+     * 停止済みフラグを持ったままのインスタンスが再利用され、
+     * 次回の接続が開始できなくなる。
+     */
+    private void releaseScrcpyService() {
+        if (scrcpy != null) {
+            // 破棄済み Activity へのコールバックを止めてから停止する
+            scrcpy.setServiceCallbacks(null);
+            scrcpy.StopService();
+        }
+        if (serviceBindRequested) {
+            serviceBindRequested = false;
+            try {
+                // 可能会导致重复解绑，所以捕获异常
+                unbindService(serviceConnection);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                // startService 済みの状態を解除し、確実に onDestroy まで到達させる
+                stopService(new Intent(this, Scrcpy.class));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        serviceBound = false;
+    }
+
     // userDisconnect ：是否为用户手动断开连接
     private void showMainView(boolean userDisconnect) {
         stopAutoDisconnectTimer();
-        if (scrcpy != null) {
-            scrcpy.StopService();
-        }
-        try {
-            // 可能会导致重复解绑，所以捕获异常
-            unbindService(serviceConnection);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        releaseScrcpyService();
         if (surface != null) {
             surface = null;
         }
@@ -182,13 +208,14 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.context = this;
+        // 回転で Activity が作り直されても方向モードを維持する
+        orientationMode = PreUtils.get(this, Constant.CONTROL_ORIENTATION_MODE, ORIENT_AUTO);
         if (savedInstanceState != null) {
             first_time = savedInstanceState.getBoolean("first_time");
             landscape = savedInstanceState.getBoolean("landscape");
             headlessMode = savedInstanceState.getBoolean("headlessMode");
             resumeScrcpy = savedInstanceState.getBoolean("resumeScrcpy");
-            forcePortrait = savedInstanceState.getBoolean("forcePortrait");
-            remoteLandscape = savedInstanceState.getBoolean("remoteLandscape");
+            orientationMode = savedInstanceState.getInt("orientationMode", orientationMode);
             screenHeight = savedInstanceState.getInt("screenHeight");
             screenWidth = savedInstanceState.getInt("screenWidth");
         }
@@ -236,8 +263,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         outState.putBoolean("first_time", first_time);
         outState.putBoolean("landscape", landscape);
         outState.putBoolean("headlessMode", headlessMode);  // 第二次进入时，intent会被重置，需要保存状态
-        outState.putBoolean("forcePortrait", forcePortrait);
-        outState.putBoolean("remoteLandscape", remoteLandscape);
+        outState.putInt("orientationMode", orientationMode);
         // 小窗模式、半屏模式切换避免恢复横竖屏，会导致黑屏（因为scrcpy恢复的resume只允许一次连接）
         // outState.putBoolean("resumeScrcpy", resumeScrcpy);
         outState.putInt("screenHeight", screenHeight);
@@ -255,8 +281,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         decorView.setSystemUiVisibility(View.VISIBLE);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         landscape = false;  // 将模式重新置为 竖屏，模式不正确将导致连接黑屏
-        remoteLandscape = false;
-        forcePortrait = PreUtils.get(context, Constant.CONTROL_FORCE_PORTRAIT, false);
+        orientationMode = PreUtils.get(context, Constant.CONTROL_FORCE_PORTRAIT, false)
+                ? ORIENT_PORTRAIT : ORIENT_AUTO;
+        PreUtils.put(context, Constant.CONTROL_ORIENTATION_MODE, orientationMode);
         setContentView(R.layout.activity_main);
         final android.widget.TextView versionText = findViewById(R.id.version_text);
         try {
@@ -370,71 +397,108 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     @SuppressLint("ClickableViewAccessibility")
     public void set_display_nd_touch() {
-        DisplayMetrics metrics = new DisplayMetrics();
-        if (ViewConfiguration.get(context).hasPermanentMenuKey()) {
-            getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        } else {
-            final Display display = getWindowManager().getDefaultDisplay();
-            display.getRealMetrics(metrics);
-        }
-//        float this_dev_height = metrics.heightPixels;
-//        float this_dev_width = metrics.widthPixels;
+        applyVideoAspectRatio();
 
-        // パディングをリセットし、コンテナのフルサイズを使用
-        linearLayout.setPadding(0, 0, 0, 0);
-        // パディングに依存せず、画面全体のサイズを基準に計算
-        DisplayMetrics dm = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getRealMetrics(dm);
-        float this_dev_height = dm.heightPixels;
-        float this_dev_width = dm.widthPixels;
-        int[] rem_res = scrcpy.get_remote_device_resolution();
-        int remote_device_height = rem_res[1];
-        int remote_device_width = rem_res[0];
-
-        // 強制縦表示 + リモート横向きの場合、リモートの実映像アスペクト比を使う
-        float remote_device_aspect_ratio;
-        boolean effectiveLandscape = landscape;
-        if (forcePortrait && remoteLandscape) {
-            // リモートは横向き映像だが、ローカルは縦表示
-            // 映像の実アスペクト比 = width / height（横向き）
-            remote_device_aspect_ratio = (float) remote_device_width / remote_device_height;
-            effectiveLandscape = false; // ローカルは縦表示のまま
-        } else {
-            remote_device_aspect_ratio = (float) remote_device_height / remote_device_width;
-        }
-
-        if (!effectiveLandscape) {                                                   //Portrait
-            float this_device_aspect_ratio = this_dev_height / this_dev_width;
-            if (remote_device_aspect_ratio > this_device_aspect_ratio) {
-                float wantWidth = this_dev_height / remote_device_aspect_ratio;
-                int padding = (int) (this_dev_width - wantWidth) / 2;
-                linearLayout.setPadding(padding, 0, padding, 0);
-            } else if (remote_device_aspect_ratio < this_device_aspect_ratio) {
-                // リモート横向き映像を縦画面に表示：上下にレターボックス
-                float wantHeight = this_dev_width * remote_device_aspect_ratio;
-                int padding = (int) (this_dev_height - wantHeight) / 2;
-                linearLayout.setPadding(0, padding, 0, padding);
-            }
-
-        } else {                                                                        //Landscape
-            float this_device_aspect_ratio = this_dev_width / this_dev_height;
-            if (remote_device_aspect_ratio > this_device_aspect_ratio) {
-                float wantHeight = this_dev_width / remote_device_aspect_ratio;
-                int padding = (int) (this_dev_height - wantHeight) / 2;
-                linearLayout.setPadding(0, padding, 0, padding);
-            } else if (remote_device_aspect_ratio < this_device_aspect_ratio) {
-                linearLayout.setPadding(((int) (((this_device_aspect_ratio - remote_device_aspect_ratio) * this_dev_height)) / 2), 0, ((int) (((this_device_aspect_ratio - remote_device_aspect_ratio) * this_dev_height)) / 2), 0);
-            }
-
+        if (surfaceView == null) {
+            return;
         }
         if (!PreUtils.get(context, Constant.CONTROL_NO, false)) {
-            // 強制縦表示時はremoteLandscapeをタッチマッピングに渡す
-            final boolean touchLandscape = forcePortrait ? remoteLandscape : landscape;
-            surfaceView.setOnTouchListener((view, event) -> scrcpy.touchevent(event, touchLandscape, surfaceView.getWidth(), surfaceView.getHeight()));
+            surfaceView.setOnTouchListener((view, event) ->
+                    scrcpy != null && scrcpy.touchevent(event, isVideoLandscape(),
+                            surfaceView.getWidth(), surfaceView.getHeight()));
         } else {
             // ビューイングモード：ピンチズーム＆パン（container ごと拡大して黒帯も含める）
             setupPinchZoom(surfaceView, linearLayout);
         }
+    }
+
+    /**
+     * 映像の実サイズを返す。デコーダから実サイズが取れていればそれを使い、
+     * まだ最初のフレームが来ていない間だけリモート解像度から推定する。
+     *
+     * @return {width, height}
+     */
+    private int[] getEffectiveVideoSize() {
+        if (scrcpy == null) {
+            return null;
+        }
+        int vw = scrcpy.getVideoWidth();
+        int vh = scrcpy.getVideoHeight();
+        if (vw > 0 && vh > 0) {
+            return new int[]{vw, vh};
+        }
+        int[] rem = scrcpy.get_remote_device_resolution();
+        if (rem == null || rem[0] <= 0 || rem[1] <= 0) {
+            return null;
+        }
+        // remote_dev_resolution は縦向き基準（幅 <= 高さ）に正規化されている
+        int shortSide = Math.min(rem[0], rem[1]);
+        int longSide = Math.max(rem[0], rem[1]);
+        // 初期表示の暫定値。実サイズ通知が届いた時点で必ず上書きされる
+        boolean assumeLandscape = (orientationMode == ORIENT_AUTO) ? landscape
+                : (orientationMode == ORIENT_LANDSCAPE);
+        return assumeLandscape ? new int[]{longSide, shortSide} : new int[]{shortSide, longSide};
+    }
+
+    /**
+     * 映像が横向きかどうか（向きの推測ではなく実サイズから判定する）。
+     */
+    private boolean isVideoLandscape() {
+        int[] size = getEffectiveVideoSize();
+        return size != null && size[0] > size[1];
+    }
+
+    /**
+     * 実映像のアスペクト比に合わせてレターボックス（黒帯）を設定する。
+     * リモート／ローカルどちらの向きにも依存しない単一の計算にすることで、
+     * 向きの推測ずれによる引き伸ばしが発生しないようにしている。
+     */
+    private void applyVideoAspectRatio() {
+        if (linearLayout == null) {
+            return;
+        }
+        int[] videoSize = getEffectiveVideoSize();
+        if (videoSize == null) {
+            linearLayout.setPadding(0, 0, 0, 0);
+            return;
+        }
+
+        // 全画面（immersive）表示なのでコンテナ＝画面全体。
+        // レイアウトの再測定待ちに依存しないよう実画面サイズを使う
+        DisplayMetrics dm = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getRealMetrics(dm);
+        float viewWidth = dm.widthPixels;
+        float viewHeight = dm.heightPixels;
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            return;
+        }
+
+        float videoAspect = (float) videoSize[0] / videoSize[1]; // 幅 / 高さ
+        float viewAspect = viewWidth / viewHeight;
+
+        int padH = 0;
+        int padV = 0;
+        if (videoAspect > viewAspect) {
+            // 映像の方が横長 → 上下に黒帯
+            padV = (int) ((viewHeight - viewWidth / videoAspect) / 2f);
+        } else if (videoAspect < viewAspect) {
+            // 映像の方が縦長 → 左右に黒帯
+            padH = (int) ((viewWidth - viewHeight * videoAspect) / 2f);
+        }
+        linearLayout.setPadding(Math.max(padH, 0), Math.max(padV, 0),
+                Math.max(padH, 0), Math.max(padV, 0));
+    }
+
+    @Override
+    public void onVideoSizeChanged(int width, int height) {
+        // デコーダスレッドから呼ばれる。
+        // ここでは黒帯の再計算だけを行う。Activity の向きには手を出さない
+        // （向きを自動補正すると 再生成→再構成→再通知 のループになり回転が止まらなくなる）
+        runOnUiThread(() -> {
+            if (linearLayout != null) {
+                applyVideoAspectRatio();
+            }
+        });
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -568,9 +632,11 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         final Switch a_Switch0 = findViewById(R.id.switch0);
         boolean no_control = a_Switch0.isChecked();
         final Switch switchFP = findViewById(R.id.switch_force_portrait);
-        forcePortrait = switchFP.isChecked();
+        boolean forcePortrait = switchFP.isChecked();
+        orientationMode = forcePortrait ? ORIENT_PORTRAIT : ORIENT_AUTO;
         PreUtils.put(context, Constant.CONTROL_NO, no_control);
         PreUtils.put(context, Constant.CONTROL_FORCE_PORTRAIT, forcePortrait);
+        PreUtils.put(context, Constant.CONTROL_ORIENTATION_MODE, orientationMode);
         // final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
         // screenControlMode = screenControlSpinner.getSelectedItemPosition();
 
@@ -720,6 +786,13 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             return false;
         });
 
+        // 表示方向の切替（自動 / 縦固定 / 横固定）
+        final Button fabOrientation = findViewById(R.id.fab_orientation);
+        if (fabOrientation != null) {
+            updateOrientationButtonLabel();
+            fabOrientation.setOnClickListener(v -> cycleOrientationMode());
+        }
+
         // ミュート切替
         final Button fabMute = findViewById(R.id.fab_mute);
         if (fabMute != null) {
@@ -799,6 +872,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         Intent intent = new Intent(this, Scrcpy.class);
         startService(intent);
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        serviceBindRequested = true;
     }
 
     @SuppressLint("SourceLockedOrientationActivity")
@@ -808,15 +882,14 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             first_time = false;
         }
 
-        if (forcePortrait) {
-            // 強制縦表示モード：Activityの向きは変えず、リモートの向き状態だけ更新
-            remoteLandscape = !remoteLandscape;
+        if (orientationMode != ORIENT_AUTO) {
+            // 方向固定モード：Activity の向きは変えずデコーダだけ作り直す。
+            // アスペクト比はデコーダからの実サイズ通知で自動的に補正される
             runOnUiThread(() -> {
                 if (serviceBound && scrcpy != null && surface != null && linearLayout != null) {
                     scrcpy.setParms(surface, screenWidth, screenHeight);
-                    // パディングリセット後、レイアウト再測定を待ってからアスペクト比を再計算
                     linearLayout.setPadding(0, 0, 0, 0);
-                    linearLayout.post(() -> set_display_nd_touch());
+                    linearLayout.post(this::set_display_nd_touch);
                 }
             });
             return;
@@ -828,15 +901,110 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         } catch (Exception e) {
             e.printStackTrace();
         }
+        serviceBindRequested = false;
         serviceBound = false;
         result_of_Rotation = true;
         landscape = !landscape;
-        remoteLandscape = landscape;
         swapDimensions();
         if (landscape) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+        }
+    }
+
+    /**
+     * フローティングメニューからの表示方向切替。
+     * 自動 → 縦固定 → 横固定 → 自動 の順に巡回する。
+     */
+    private void cycleOrientationMode() {
+        int next;
+        switch (orientationMode) {
+            case ORIENT_AUTO:
+                next = ORIENT_PORTRAIT;
+                break;
+            case ORIENT_PORTRAIT:
+                next = ORIENT_LANDSCAPE;
+                break;
+            default:
+                next = ORIENT_AUTO;
+                break;
+        }
+        setOrientationMode(next);
+    }
+
+    @SuppressLint("SourceLockedOrientationActivity")
+    private void setOrientationMode(int mode) {
+        orientationMode = mode;
+        PreUtils.put(context, Constant.CONTROL_ORIENTATION_MODE, mode);
+        updateOrientationButtonLabel();
+
+        final boolean targetLandscape;
+        final int requested;
+        switch (mode) {
+            case ORIENT_PORTRAIT:
+                targetLandscape = false;
+                requested = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                break;
+            case ORIENT_LANDSCAPE:
+                targetLandscape = true;
+                requested = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+                break;
+            default:
+                // 自動：現在受信している映像の向きに合わせる
+                targetLandscape = isVideoLandscape();
+                requested = targetLandscape
+                        ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        : ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT;
+                break;
+        }
+
+        boolean currentLandscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        if (currentLandscape == targetLandscape) {
+            // 画面の向きは変わらない＝Activity は作り直されないので、黒帯だけ再計算する
+            landscape = targetLandscape;
+            setRequestedOrientation(requested);
+            if (linearLayout != null) {
+                linearLayout.post(this::set_display_nd_touch);
+            }
+            return;
+        }
+
+        // 向きが変わる＝Activity が再生成される。既存の回転フローと同じ手順を踏む。
+        // サーバー起因の回転では loop() が setParms 待ちで停止しているが、
+        // こちらは動作中に Surface が破棄されるため、先にデコーダを止めておく。
+        // （止めないと破棄済み Surface へのデコードで例外→接続断になる）
+        if (scrcpy != null) {
+            scrcpy.pause();
+        }
+        try {
+            unbindService(serviceConnection);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        serviceBindRequested = false;
+        serviceBound = false;
+        result_of_Rotation = true;
+        landscape = targetLandscape;
+        setRequestedOrientation(requested);
+    }
+
+    private void updateOrientationButtonLabel() {
+        final Button fabOrientation = findViewById(R.id.fab_orientation);
+        if (fabOrientation == null) {
+            return;
+        }
+        switch (orientationMode) {
+            case ORIENT_PORTRAIT:
+                fabOrientation.setText(R.string.fab_orientation_portrait);
+                break;
+            case ORIENT_LANDSCAPE:
+                fabOrientation.setText(R.string.fab_orientation_landscape);
+                break;
+            default:
+                fabOrientation.setText(R.string.fab_orientation_auto);
+                break;
         }
     }
 
@@ -853,6 +1021,22 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
                         MainActivity.this.finish();
                     }
                 }, false);
+    }
+
+    @Override
+    protected void onDestroy() {
+        // 回転による作り直しでは接続を維持する必要があるため isFinishing() で区別する
+        if (isFinishing()) {
+            stopAutoDisconnectTimer();
+            releaseScrcpyService();
+            scrcpy = null;
+            surface = null;
+            surfaceView = null;
+            if (sensorManager != null) {
+                sensorManager.unregisterListener(this);
+            }
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -993,19 +1177,6 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             Toast.makeText(context, "Server Address Empty", Toast.LENGTH_SHORT).show();
             connectExitExt();
         }
-    }
-
-    @SuppressLint("SourceLockedOrientationActivity")
-    private void toggleForcePortrait() {
-        forcePortrait = !forcePortrait;
-        PreUtils.put(context, Constant.CONTROL_FORCE_PORTRAIT, forcePortrait);
-        // 切断してメイン画面に戻り、設定を反映した状態で再接続してもらう
-        showMainView(true);
-        first_time = true;
-        Toast.makeText(context,
-                forcePortrait ? "Force Portrait: ON — please reconnect"
-                              : "Force Portrait: OFF — please reconnect",
-                Toast.LENGTH_SHORT).show();
     }
 
     /**
