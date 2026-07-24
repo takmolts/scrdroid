@@ -60,15 +60,16 @@ public class HelpActivity extends Activity {
                 + "<h3>接続中の操作（⚙ フローティングメニュー）</h3>"
                 + "<p>接続中は画面右下の <b>⚙ ボタン</b>をタップするとメニューが開きます。<br>"
                 + "⚙ ボタンはドラッグで好きな位置に移動できます。</p>"
-                + "<p>メニューの内容：</p>"
-                + "<p>・<b>↻ 表示方向</b> — タップするたびに 自動 → 縦固定 → 横固定 と切り替わります。<br>"
+                + "<p>メニューはアイコンが2段に並んでいます：</p>"
+                + "<p>上段　<b>📴</b> 画面OFF ／ <b>🔊</b>・<b>🔇</b> 音声 ／ <b>自</b>・<b>縦</b>・<b>横</b> 表示方向</p>"
+                + "<p>下段　<b>◁</b> 戻る ／ <b>○</b> ホーム ／ <b>□</b> タスクリスト</p>"
+                + "<p>最下段　<b>✖</b> 切断（誤タップを避けるため独立した行にしています）</p>"
+                + "<p><b>表示方向</b>はタップするたびに 自動（自）→ 縦固定（縦）→ 横固定（横）と切り替わり、"
+                + "アイコンで現在の状態が分かります。<br>"
                 + "「自動」はリモートの向きに追従、「縦固定」「横固定」は接続したままこちらの表示だけを固定します。</p>"
-                + "<p>・<b>📴 画面OFF</b> — リモートの画面を ON/OFF トグル</p>"
-                + "<p>・<b>🔊 音声ON / 🔇 ミュート</b> — 音声の ON/OFF 切替</p>"
-                + "<p>・<b>◁ Back</b> — 戻るキー送信</p>"
-                + "<p>・<b>○ Home</b> — ホームキー送信</p>"
-                + "<p>・<b>□ Tasks</b> — タスクリスト表示</p>"
-                + "<p>・<b>✖ 切断</b> — 接続を終了してメイン画面に戻る</p>";
+                + "<h3>画面分割（マルチウィンドウ）</h3>"
+                + "<p>画面分割にも対応しています。分割中は表示方向の切替は黒帯の調整のみとなり、"
+                + "アプリの向き自体は OS の制御に従います。</p>";
     }
 
     private String getHelpEn() {
@@ -103,14 +104,15 @@ public class HelpActivity extends Activity {
                 + "<h3>Controls During Connection (⚙ Floating Menu)</h3>"
                 + "<p>Tap the <b>⚙ button</b> at the bottom-right to open the menu.<br>"
                 + "The ⚙ button can be dragged to any position.</p>"
-                + "<p>Menu items:</p>"
-                + "<p>• <b>↻ Orientation</b> — Cycles through Auto / Portrait / Landscape.<br>"
+                + "<p>The menu is a two-row icon grid:</p>"
+                + "<p>Top row: <b>📴</b> Screen OFF / <b>🔊</b>·<b>🔇</b> Audio / <b>自</b>·<b>縦</b>·<b>横</b> Orientation</p>"
+                + "<p>Bottom row: <b>◁</b> Back / <b>○</b> Home / <b>□</b> Tasks</p>"
+                + "<p>Last row: <b>✖</b> Disconnect (kept on its own row to avoid mis-taps)</p>"
+                + "<p><b>Orientation</b> cycles through Auto (自), Portrait (縦) and Landscape (横); "
+                + "the icon shows the current mode.<br>"
                 + "Auto follows the remote device; Portrait and Landscape lock the local display without reconnecting.</p>"
-                + "<p>• <b>📴 Screen OFF</b> — Toggle remote screen ON/OFF</p>"
-                + "<p>• <b>🔊 Sound / 🔇 Mute</b> — Toggle audio</p>"
-                + "<p>• <b>◁ Back</b> — Send back key</p>"
-                + "<p>• <b>○ Home</b> — Send home key</p>"
-                + "<p>• <b>□ Tasks</b> — Show task switcher</p>"
-                + "<p>• <b>✖ Disconnect</b> — End connection and return to main screen</p>";
+                + "<h3>Split Screen (Multi-Window)</h3>"
+                + "<p>Split screen is supported. While in split screen, the orientation control only adjusts "
+                + "the letterboxing; the app orientation itself is controlled by the OS.</p>";
     }
 }

@@ -463,13 +463,14 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             return;
         }
 
-        // 全画面（immersive）表示なのでコンテナ＝画面全体。
-        // レイアウトの再測定待ちに依存しないよう実画面サイズを使う
-        DisplayMetrics dm = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getRealMetrics(dm);
-        float viewWidth = dm.widthPixels;
-        float viewHeight = dm.heightPixels;
+        // コンテナの実サイズを基準にする。
+        // 画面分割（マルチウィンドウ）では画面全体とウィンドウのサイズが異なり、
+        // 画面全体を基準にすると黒帯がコンテナを超えて映像が消える
+        float viewWidth = linearLayout.getWidth();
+        float viewHeight = linearLayout.getHeight();
         if (viewWidth <= 0 || viewHeight <= 0) {
+            // まだレイアウトされていない。測定後に onLayoutChange から再度呼ばれる
+            linearLayout.setPadding(0, 0, 0, 0);
             return;
         }
 
@@ -485,8 +486,21 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             // 映像の方が縦長 → 左右に黒帯
             padH = (int) ((viewWidth - viewHeight * videoAspect) / 2f);
         }
-        linearLayout.setPadding(Math.max(padH, 0), Math.max(padV, 0),
-                Math.max(padH, 0), Math.max(padV, 0));
+        // 黒帯がコンテナを埋め尽くして映像が消えないよう上限を設ける
+        padH = clampPadding(padH, viewWidth);
+        padV = clampPadding(padV, viewHeight);
+        linearLayout.setPadding(padH, padV, padH, padV);
+    }
+
+    /**
+     * 左右（上下）合計のパディングがコンテナを超えないよう制限する。
+     */
+    private static int clampPadding(int padding, float containerSize) {
+        if (padding <= 0) {
+            return 0;
+        }
+        int max = (int) (containerSize / 2f) - 1;
+        return Math.min(padding, Math.max(max, 0));
     }
 
     @Override
@@ -722,6 +736,15 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         surface = surfaceView.getHolder().getSurface();
         linearLayout = findViewById(R.id.container1);
 
+        // コンテナのサイズが決まった／変わったタイミングで黒帯を計算し直す。
+        // 初回レイアウトのほか、画面分割の境界ドラッグやウィンドウサイズ変更にも追従する
+        linearLayout.addOnLayoutChangeListener((v, left, top, right, bottom,
+                                                oldLeft, oldTop, oldRight, oldBottom) -> {
+            if ((right - left) != (oldRight - oldLeft) || (bottom - top) != (oldBottom - oldTop)) {
+                v.post(this::applyVideoAspectRatio);
+            }
+        });
+
         // フローティングメニューの設定
         setupFloatingMenu();
 
@@ -882,7 +905,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             first_time = false;
         }
 
-        if (orientationMode != ORIENT_AUTO) {
+        // 画面分割中は Activity の向きを変えられない（setRequestedOrientation が無視され、
+        // 再生成を待つと二度と戻ってこない）ため、方向固定モードと同じ扱いにする
+        if (orientationMode != ORIENT_AUTO || isInMultiWindow()) {
             // 方向固定モード：Activity の向きは変えずデコーダだけ作り直す。
             // アスペクト比はデコーダからの実サイズ通知で自動的に補正される
             runOnUiThread(() -> {
@@ -961,6 +986,15 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
         boolean currentLandscape = getResources().getConfiguration().orientation
                 == Configuration.ORIENTATION_LANDSCAPE;
+        if (isInMultiWindow()) {
+            // 画面分割中は setRequestedOrientation が無視されるため、
+            // 再生成を待つと二度と戻ってこない。黒帯の再計算だけを行う
+            landscape = targetLandscape;
+            if (linearLayout != null) {
+                linearLayout.post(this::set_display_nd_touch);
+            }
+            return;
+        }
         if (currentLandscape == targetLandscape) {
             // 画面の向きは変わらない＝Activity は作り直されないので、黒帯だけ再計算する
             landscape = targetLandscape;
@@ -1061,12 +1095,24 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         }
     }
 
+    /**
+     * 画面分割などのマルチウィンドウ表示中かどうか。
+     */
+    private boolean isInMultiWindow() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode();
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
         Log.d("Scrcpy", "onPause: " + serviceBound);
         if (serviceBound && scrcpy != null) {
-            scrcpy.pause();
+            // 画面分割中は、もう一方のアプリを操作すると onPause が来るが
+            // こちらの画面は見えたままなので、デコーダは止めない（止めると黒画面になる）。
+            // onStop まで進んだ場合は従来どおり切断される
+            if (!isInMultiWindow()) {
+                scrcpy.pause();
+            }
             resumeScrcpy = true;
         }
     }

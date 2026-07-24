@@ -29,13 +29,13 @@
     <item>ONにする</item>
     <item>OFFにする</item>
   </string-array>
-  <string name="fab_disconnect">&#x2716; 切断</string>
-  <string name="fab_mute_on">&#x1F507; ミュート</string>
-  <string name="fab_mute_off">&#x1F50A; 音声ON</string>
-  <string name="fab_screen_off">&#x1F4F4; 画面OFF</string>
-  <string name="fab_orientation_auto">&#x21BB; 表示方向: 自動</string>
-  <string name="fab_orientation_portrait">&#x2B0D; 表示方向: 縦固定</string>
-  <string name="fab_orientation_landscape">&#x2B0C; 表示方向: 横固定</string>
+  <string name="fab_disconnect">&#x2716;</string>
+  <string name="fab_mute_on">&#x1F507;</string>
+  <string name="fab_mute_off">&#x1F50A;</string>
+  <string name="fab_screen_off">&#x1F4F4;</string>
+  <string name="fab_orientation_auto">自</string>
+  <string name="fab_orientation_portrait">縦</string>
+  <string name="fab_orientation_landscape">横</string>
   <string name="connect_tips">ヒント: デバイスでワイヤレスデバッグを有効化する必要があります。\n\t\tadb ポートコマンドのリセット: adb tcpip 5555</string>
   <string name="please_wait">接続中 …</string>
   <string name="connect_faild">接続に失敗しました</string>

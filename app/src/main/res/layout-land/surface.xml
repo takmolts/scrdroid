@@ -35,7 +35,7 @@
         android:textSize="20sp"
         android:alpha="0.6" />
 
-    <!-- Floating control panel (hidden by default) -->
+    <!-- Floating control panel (icon tiles, hidden by default) -->
     <LinearLayout
         android:id="@+id/floating_panel"
         android:layout_width="wrap_content"
@@ -43,74 +43,117 @@
         android:layout_gravity="bottom|end"
         android:layout_marginRight="12dp"
         android:layout_marginBottom="68dp"
-        android:background="#CC333333"
+        android:background="#E02A2C36"
         android:orientation="vertical"
-        android:padding="4dp"
+        android:padding="5dp"
         android:visibility="gone"
         tools:visibility="visible">
 
-        <Button
-            android:id="@+id/fab_orientation"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/fab_orientation_auto"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/fab_screen_off"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/fab_screen_off"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+            <Button
+                android:id="@+id/fab_screen_off"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_margin="3dp"
+                android:background="@drawable/fab_tile_selector"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="@string/fab_screen_off"
+                android:textColor="@android:color/white"
+                android:textSize="18sp" />
 
-        <Button
-            android:id="@+id/fab_mute"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/fab_mute_off"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+            <Button
+                android:id="@+id/fab_mute"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_margin="3dp"
+                android:background="@drawable/fab_tile_selector"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="@string/fab_mute_off"
+                android:textColor="@android:color/white"
+                android:textSize="18sp" />
 
-        <Button
-            android:id="@+id/fab_back"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/fab_back"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+            <Button
+                android:id="@+id/fab_orientation"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_margin="3dp"
+                android:background="@drawable/fab_tile_selector"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="@string/fab_orientation_auto"
+                android:textColor="@android:color/white"
+                android:textSize="20sp" />
 
-        <Button
-            android:id="@+id/fab_home"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/fab_home"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+        </LinearLayout>
 
-        <Button
-            android:id="@+id/fab_appswitch"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:text="@string/fab_appswitch"
-            android:textColor="@android:color/white"
-            android:textSize="13sp" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
+            <Button
+                android:id="@+id/fab_back"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_margin="3dp"
+                android:background="@drawable/fab_tile_selector"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="@string/fab_back"
+                android:textColor="@android:color/white"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/fab_home"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_margin="3dp"
+                android:background="@drawable/fab_tile_selector"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="@string/fab_home"
+                android:textColor="@android:color/white"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/fab_appswitch"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_margin="3dp"
+                android:background="@drawable/fab_tile_selector"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="@string/fab_appswitch"
+                android:textColor="@android:color/white"
+                android:textSize="18sp" />
+
+        </LinearLayout>
+
+        <!-- 誤タップを避けるため切断だけ独立した行に置く -->
         <Button
             android:id="@+id/fab_disconnect"
-            style="?android:attr/buttonBarButtonStyle"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="36dp"
+            android:layout_margin="3dp"
+            android:background="@drawable/fab_tile_disconnect_selector"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
             android:text="@string/fab_disconnect"
-            android:textColor="#FFFF6666"
-            android:textSize="13sp" />
+            android:textColor="#FFFF8080"
+            android:textSize="16sp" />
 
     </LinearLayout>
 

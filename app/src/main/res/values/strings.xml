@@ -20,16 +20,16 @@
         <item>Turn OFF</item>
     </string-array>
     <string name="fab_menu_icon">&#x2699;</string>
-    <string name="fab_disconnect">&#x2716; Disconnect</string>
-    <string name="fab_mute_on">&#x1F507; Mute</string>
-    <string name="fab_mute_off">&#x1F50A; Sound</string>
-    <string name="fab_screen_off">&#x1F4F4; Screen OFF</string>
-    <string name="fab_orientation_auto">&#x21BB; Orientation: Auto</string>
-    <string name="fab_orientation_portrait">&#x2B0D; Orientation: Portrait</string>
-    <string name="fab_orientation_landscape">&#x2B0C; Orientation: Landscape</string>
-    <string name="fab_back">&#x25C1; Back</string>
-    <string name="fab_home">&#x25CB; Home</string>
-    <string name="fab_appswitch">&#x25A1; Tasks</string>
+    <string name="fab_disconnect">&#x2716;</string>
+    <string name="fab_mute_on">&#x1F507;</string>
+    <string name="fab_mute_off">&#x1F50A;</string>
+    <string name="fab_screen_off">&#x1F4F4;</string>
+    <string name="fab_orientation_auto">自</string>
+    <string name="fab_orientation_portrait">縦</string>
+    <string name="fab_orientation_landscape">横</string>
+    <string name="fab_back">&#x25C1;</string>
+    <string name="fab_home">&#x25CB;</string>
+    <string name="fab_appswitch">&#x25A1;</string>
     <string name="switch0">Viewing mode (no control)</string>
     <string name="switch1">Bottom control button (back button)</string>
 
