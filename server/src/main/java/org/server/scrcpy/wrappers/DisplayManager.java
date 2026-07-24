@@ -1,5 +1,6 @@
 package org.server.scrcpy.wrappers;
 
+import android.content.Context;
 import android.hardware.display.VirtualDisplay;
 import android.os.IInterface;
 import android.view.Display;
@@ -9,6 +10,7 @@ import org.server.scrcpy.DisplayInfo;
 import org.server.scrcpy.Ln;
 import org.server.scrcpy.Size;
 import org.server.scrcpy.util.Command;
+import org.server.scrcpy.util.FakeContext;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -124,5 +126,29 @@ public final class DisplayManager {
     public VirtualDisplay createVirtualDisplay(String name, int width, int height, int displayIdToMirror, Surface surface) throws Exception {
         Method method = getCreateVirtualDisplayMethod();
         return (VirtualDisplay) method.invoke(null, name, width, height, displayIdToMirror, surface);
+    }
+
+    /**
+     * 仮想ディスプレイモード用 (Phase 1)
+     * 既存 createVirtualDisplay (5引数版) は static reflection 呼び出しで動作しているが、
+     * 独立画面用の 6引数版 (flags 付き) は android.hardware.display.DisplayManager の
+     * インスタンスメソッドを直接呼ぶ必要がある。
+     * FakeContext 経由で system service を取得して呼び出す。
+     *
+     * 使用フラグ例:
+     *   VIRTUAL_DISPLAY_FLAG_PUBLIC = 1
+     *   VIRTUAL_DISPLAY_FLAG_PRESENTATION = 2
+     *   VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY = 8
+     *   VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS = 64 (Android 10+)
+     */
+    public VirtualDisplay createVirtualDisplayWithFlags(String name, int width, int height, int dpi, Surface surface, int flags)
+            throws Exception {
+        Context ctx = FakeContext.get();
+        android.hardware.display.DisplayManager dm =
+                (android.hardware.display.DisplayManager) ctx.getSystemService(Context.DISPLAY_SERVICE);
+        if (dm == null) {
+            throw new IllegalStateException("DISPLAY_SERVICE unavailable from FakeContext");
+        }
+        return dm.createVirtualDisplay(name, width, height, dpi, surface, flags);
     }
 }

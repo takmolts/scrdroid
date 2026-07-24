@@ -23,6 +23,7 @@
   <string name="switch0">ビューイングモード (コントロールなし)</string>
   <string name="switch1">下部のコントロールボタン (戻るボタン)</string>
   <string name="switch_force_portrait">強制縦画面表示</string>
+  <string name="switch_virtual_display">仮想ディスプレイモード (拡張・独立画面)</string>
   <string name="screen_control">接続時の画面</string>
   <string-array name="options_screen_control_keys">
     <item>何もしない</item>

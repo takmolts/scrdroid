@@ -13,6 +13,11 @@ import org.server.scrcpy.wrappers.SurfaceControl;
 
 public class ScreenCapture {
 
+    // Android VirtualDisplay 用フラグ (android.hardware.display.DisplayManager 定義値)
+    private static final int VIRTUAL_DISPLAY_FLAG_PUBLIC = 1;
+    private static final int VIRTUAL_DISPLAY_FLAG_PRESENTATION = 1 << 1;
+    private static final int VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY = 1 << 3;
+
     private final Device device;
     private IBinder display;
     private VirtualDisplay virtualDisplay;
@@ -35,6 +40,28 @@ public class ScreenCapture {
         if (virtualDisplay != null) {
             virtualDisplay.release();
             virtualDisplay = null;
+        }
+
+        Options options = device.getOptions();
+        if (options != null && options.isVirtualDisplayMode()) {
+            // 仮想ディスプレイモード: 物理画面と独立した VirtualDisplay を生成
+            int dpi = options.getVirtualDpi() > 0 ? options.getVirtualDpi() : 320;
+            int flags = VIRTUAL_DISPLAY_FLAG_PUBLIC
+                    | VIRTUAL_DISPLAY_FLAG_PRESENTATION
+                    | VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
+            try {
+                virtualDisplay = ServiceManager.getDisplayManager()
+                        .createVirtualDisplayWithFlags("scrcpy-virtual",
+                                videoRect.width(), videoRect.height(), dpi, surface, flags);
+                if (virtualDisplay != null && virtualDisplay.getDisplay() != null) {
+                    device.setVirtualDisplayId(virtualDisplay.getDisplay().getDisplayId());
+                }
+                Ln.d("Display: virtual display mode (id=" + device.getVirtualDisplayId() + ")");
+                return;
+            } catch (Exception e) {
+                Log.e("ScreenCapture", "createVirtualDisplayWithFlags failed", e);
+                throw new AssertionError("Could not create virtual display", e);
+            }
         }
 
         try {

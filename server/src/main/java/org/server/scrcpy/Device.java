@@ -13,9 +13,13 @@ public final class Device {
     // private final ServiceManager serviceManager = new ServiceManager();
     private ScreenInfo screenInfo;
     private RotationListener rotationListener;
+    private final Options options;
+    // 仮想ディスプレイモード時の VirtualDisplay の displayId (Phase 2 以降の入力ルーティングで使用)
+    private int virtualDisplayId = -1;
 
     public Device(Options options) {
-        screenInfo = computeScreenInfo(options.getMaxSize());
+        this.options = options;
+        screenInfo = computeScreenInfo(options);
         registerRotationWatcher(new IRotationWatcher.Stub() {
             @Override
             public void onRotationChanged(int rotation) throws RemoteException {
@@ -40,15 +44,24 @@ public final class Device {
     }
 
     @SuppressWarnings("checkstyle:MagicNumber")
-    private ScreenInfo computeScreenInfo(int maxSize) {
+    private ScreenInfo computeScreenInfo(Options options) {
         // Compute the video size and the padding of the content inside this video.
         // Principle:
         // - scale down the great side of the screen to maxSize (if necessary);
         // - scale down the other side so that the aspect ratio is preserved;
         // - round this value to the nearest multiple of 8 (H.264 only accepts multiples of 8)
+        int maxSize = options.getMaxSize();
         DisplayInfo displayInfo = ServiceManager.getDisplayManager().getDisplayInfo();
         boolean rotated = (displayInfo.getRotation() & 1) != 0;
         Size deviceSize = displayInfo.getSize();
+        // 仮想ディスプレイモードかつサイズ指定があればそちらを優先
+        if (options.isVirtualDisplayMode()
+                && options.getVirtualWidth() > 0
+                && options.getVirtualHeight() > 0) {
+            deviceSize = new Size(options.getVirtualWidth(), options.getVirtualHeight());
+            // 仮想画面は回転を持たない前提
+            rotated = false;
+        }
         int w = deviceSize.getWidth() & ~7; // in case it's not a multiple of 8
         int h = deviceSize.getHeight() & ~7;
         if (maxSize > 0) {
@@ -102,6 +115,18 @@ public final class Device {
 
     public synchronized void setRotationListener(RotationListener rotationListener) {
         this.rotationListener = rotationListener;
+    }
+
+    public Options getOptions() {
+        return options;
+    }
+
+    public int getVirtualDisplayId() {
+        return virtualDisplayId;
+    }
+
+    public void setVirtualDisplayId(int virtualDisplayId) {
+        this.virtualDisplayId = virtualDisplayId;
     }
 
     public Point NewgetPhysicalPoint(Point point) {

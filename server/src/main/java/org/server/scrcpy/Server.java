@@ -76,6 +76,32 @@ public final class Server {
         // use "adb forward" instead of "adb tunnel"? (so the server must listen)
         boolean tunnelForward = Boolean.parseBoolean(args[3]);
         options.setTunnelForward(tunnelForward);
+
+        // 仮想ディスプレイモード関連オプション (Phase 1)
+        // args[4] : 仮想ディスプレイモード (0/1)
+        // args[5] : 仮想ディスプレイ幅 (0=物理画面と同一)
+        // args[6] : 仮想ディスプレイ高さ (0=物理画面と同一)
+        // args[7] : 仮想ディスプレイ DPI (0=物理画面と同一)
+        if (args.length < 5) {
+            return options;
+        }
+        options.setVirtualDisplayMode("1".equals(args[4]) || Boolean.parseBoolean(args[4]));
+
+        if (args.length < 6) {
+            return options;
+        }
+        options.setVirtualWidth(Integer.parseInt(args[5]));
+
+        if (args.length < 7) {
+            return options;
+        }
+        options.setVirtualHeight(Integer.parseInt(args[6]));
+
+        if (args.length < 8) {
+            return options;
+        }
+        options.setVirtualDpi(Integer.parseInt(args[7]));
+
         return options;
     }
 

@@ -255,6 +255,26 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
+            <!-- 仮想ディスプレイ (拡張ディスプレイ) モード -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Switch
+                    android:id="@+id/switch_virtual_display"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#323540"
+                    android:gravity="center_vertical"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/switch_virtual_display"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <!-- Help button -->
             <Button
                 android:id="@+id/button_help"
