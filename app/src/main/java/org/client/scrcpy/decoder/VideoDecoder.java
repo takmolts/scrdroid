@@ -114,12 +114,28 @@ public class VideoDecoder {
             mWorker = null;
             // 先に未設定にしてから停止し、他スレッドが停止済みコーデックに触れないようにする
             mIsConfigured.set(false);
-            if (mCodec != null) {
-                try {
-                    mCodec.stop();
-                } catch (IllegalStateException e) {
-                    Log.w(TAG, "video codec stop failed: " + e);
-                }
+            releaseCodec();
+        }
+    }
+
+    /**
+     * コーデックを停止して解放する。
+     * stop() だけではネイティブのデコーダリソースが残り、再構成を繰り返すと
+     * リークしてデコーダが枯渇するため、必ず release() まで行う。
+     */
+    private void releaseCodec() {
+        MediaCodec codec = mCodec;
+        mCodec = null;
+        if (codec != null) {
+            try {
+                codec.stop();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "video codec stop failed: " + e);
+            }
+            try {
+                codec.release();
+            } catch (Exception e) {
+                Log.w(TAG, "video codec release failed: " + e);
             }
         }
     }
@@ -136,23 +152,19 @@ public class VideoDecoder {
         }
 
         private void configure(Surface surface, int width, int height, ByteBuffer csd0, ByteBuffer csd1) {
-            if (mIsConfigured.get()) {
-                mIsConfigured.set(false);
-                if (mCodec != null) {
-                    try {
-                        mCodec.stop();
-                    } catch (IllegalStateException ignore) {
-                        // 既に停止済み
-                    }
-                }
-            }
+            // 再構成の前に既存コーデックを必ず解放する（stop だけではリークする）
+            mIsConfigured.set(false);
+            releaseCodec();
+
             MediaFormat format = MediaFormat.createVideoFormat("video/avc", width, height);
             format.setByteBuffer("csd-0", csd0);
             format.setByteBuffer("csd-1", csd1);
             try {
-                mCodec = MediaCodec.createDecoderByType("video/avc");
-                mCodec.configure(format, surface, null, 0);
-                mCodec.start();
+                MediaCodec codec = MediaCodec.createDecoderByType("video/avc");
+                codec.configure(format, surface, null, 0);
+                codec.start();
+                // 生成に成功してから公開する（失敗時は mCodec=null のまま）
+                mCodec = codec;
                 mIsConfigured.set(true);
             } catch (IOException | IllegalStateException | IllegalArgumentException e) {
                 // Surface が破棄された直後などに失敗しうる。
@@ -166,21 +178,24 @@ public class VideoDecoder {
 
         @SuppressWarnings("deprecation")
         public void decodeSample(byte[] data, int offset, int size, long presentationTimeUs, int flags) {
-            if (mIsConfigured.get() && mIsRunning.get()) {
+            // mCodec はローカルに退避する。別スレッドの release と競合しても
+            // NPE にならないよう、掴んだ参照だけを使う
+            MediaCodec codec = mCodec;
+            if (mIsConfigured.get() && mIsRunning.get() && codec != null) {
                 try {
-                    int index = mCodec.dequeueInputBuffer(-1);
+                    int index = codec.dequeueInputBuffer(-1);
                     if (index >= 0) {
                         ByteBuffer buffer;
 
                         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-                            buffer = mCodec.getInputBuffers()[index];
+                            buffer = codec.getInputBuffers()[index];
                             buffer.clear();
                         } else {
-                            buffer = mCodec.getInputBuffer(index);
+                            buffer = codec.getInputBuffer(index);
                         }
                         if (buffer != null) {
                             buffer.put(data, offset, size);
-                            mCodec.queueInputBuffer(index, 0, size, presentationTimeUs, flags);
+                            codec.queueInputBuffer(index, 0, size, presentationTimeUs, flags);
                         }
                     }
                 } catch (IllegalStateException e) {
@@ -197,17 +212,18 @@ public class VideoDecoder {
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
             while (mIsRunning.get()) {
                 try {
-                    if (mIsConfigured.get()) {
-                        int index = mCodec.dequeueOutputBuffer(info, 0);
+                    MediaCodec codec = mCodec;
+                    if (mIsConfigured.get() && codec != null) {
+                        int index = codec.dequeueOutputBuffer(info, 0);
                         if (index >= 0) {
                             // setting true is telling system to render frame onto Surface
-                            mCodec.releaseOutputBuffer(index, true);
+                            codec.releaseOutputBuffer(index, true);
                             if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) == MediaCodec.BUFFER_FLAG_END_OF_STREAM) {
                                 break;
                             }
                         } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                             // 実映像サイズが確定した（回転後もここで必ず通知される）
-                            updateVideoSize(mCodec.getOutputFormat());
+                            updateVideoSize(codec.getOutputFormat());
                         }
                     } else {
                         // just waiting to be configured, then decode and render

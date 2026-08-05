@@ -76,19 +76,49 @@ public class AudioDecoder {
             mWorker.setRunning(false);
             mWorker = null;
             mIsConfigured.set(false);
-            if (mCodec != null) {
-                try {
-                    mCodec.stop();
-                } catch (IllegalStateException e) {
-                    Log.w(TAG, "audio codec stop failed: " + e);
-                }
+            releaseCodec();
+            releaseAudioTrack();
+        }
+    }
+
+    /**
+     * コーデックを停止して解放する。
+     * stop() だけではネイティブのデコーダリソースが残り、再構成を繰り返すと
+     * リークするため、必ず release() まで行う。
+     */
+    private void releaseCodec() {
+        MediaCodec codec = mCodec;
+        mCodec = null;
+        if (codec != null) {
+            try {
+                codec.stop();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "audio codec stop failed: " + e);
             }
-            if (audioTrack != null) {
-                try {
-                    audioTrack.stop();
-                } catch (IllegalStateException e) {
-                    Log.w(TAG, "audioTrack stop failed: " + e);
-                }
+            try {
+                codec.release();
+            } catch (Exception e) {
+                Log.w(TAG, "audio codec release failed: " + e);
+            }
+        }
+    }
+
+    /**
+     * AudioTrack を停止して解放する（同じくリーク防止のため release まで行う）。
+     */
+    private void releaseAudioTrack() {
+        AudioTrack track = audioTrack;
+        audioTrack = null;
+        if (track != null) {
+            try {
+                track.stop();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "audioTrack stop failed: " + e);
+            }
+            try {
+                track.release();
+            } catch (Exception e) {
+                Log.w(TAG, "audioTrack release failed: " + e);
             }
         }
     }
@@ -105,23 +135,11 @@ public class AudioDecoder {
         }
 
         private void configure(byte[] data) {
-            if (mIsConfigured.get()) {
-                mIsConfigured.set(false);
-                if (mCodec != null) {
-                    try {
-                        mCodec.stop();
-                    } catch (IllegalStateException ignore) {
-                        // 既に停止済み
-                    }
-                }
-                if (audioTrack != null) {
-                    try {
-                        audioTrack.stop();
-                    } catch (IllegalStateException ignore) {
-                        // 既に停止済み
-                    }
-                }
-            }
+            // 再構成の前に既存のコーデック／プレーヤーを必ず解放する
+            mIsConfigured.set(false);
+            releaseCodec();
+            releaseAudioTrack();
+
             MediaFormat format = MediaFormat.createAudioFormat(MIMETYPE_AUDIO_AAC, SAMPLE_RATE, 2);
             // 设置比特率
             format.setInteger(MediaFormat.KEY_BIT_RATE, 128000);
@@ -130,15 +148,16 @@ public class AudioDecoder {
             format.setByteBuffer("csd-0", ByteBuffer.wrap(data));
 
             try {
-                mCodec = MediaCodec.createDecoderByType(MIMETYPE_AUDIO_AAC);
-                mCodec.configure(format, null, null, 0);
-                mCodec.start();
-                mIsConfigured.set(true);
+                MediaCodec codec = MediaCodec.createDecoderByType(MIMETYPE_AUDIO_AAC);
+                codec.configure(format, null, null, 0);
+                codec.start();
+                mCodec = codec;
 
                 // 初始化音频播放器
                 initAudioTrack();
                 // audio track 启动
                 audioTrack.play();
+                mIsConfigured.set(true);
             } catch (IOException | IllegalStateException | IllegalArgumentException e) {
                 // 例外を投げると呼び出し元の通信ループが落ちて接続断になるため、
                 // 未設定のままにして次の CONFIG で再構成させる
@@ -150,21 +169,22 @@ public class AudioDecoder {
 
         @SuppressWarnings("deprecation")
         public void decodeSample(byte[] data, int offset, int size, long presentationTimeUs, int flags) {
-            if (mIsConfigured.get() && mIsRunning.get()) {
+            MediaCodec codec = mCodec;
+            if (mIsConfigured.get() && mIsRunning.get() && codec != null) {
                 try {
-                    int index = mCodec.dequeueInputBuffer(-1);
+                    int index = codec.dequeueInputBuffer(-1);
                     if (index >= 0) {
                         ByteBuffer buffer;
 
                         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-                            buffer = mCodec.getInputBuffers()[index];
+                            buffer = codec.getInputBuffers()[index];
                             buffer.clear();
                         } else {
-                            buffer = mCodec.getInputBuffer(index);
+                            buffer = codec.getInputBuffer(index);
                         }
                         if (buffer != null) {
                             buffer.put(data, offset, size);
-                            mCodec.queueInputBuffer(index, 0, size, presentationTimeUs, flags);
+                            codec.queueInputBuffer(index, 0, size, presentationTimeUs, flags);
                         }
                     }
                 } catch (IllegalStateException e) {
@@ -180,8 +200,10 @@ public class AudioDecoder {
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
             while (mIsRunning.get()) {
                 try {
-                    if (mIsConfigured.get()) {
-                        int index = mCodec.dequeueOutputBuffer(info, 0);
+                    MediaCodec codec = mCodec;
+                    AudioTrack track = audioTrack;
+                    if (mIsConfigured.get() && codec != null && track != null) {
+                        int index = codec.dequeueOutputBuffer(info, 0);
                         // Log.e("Scrcpy", "Audio Decoder: " + index);
                         if (index >= 0) {
                             if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) == MediaCodec.BUFFER_FLAG_END_OF_STREAM) {
@@ -190,15 +212,15 @@ public class AudioDecoder {
                             // Log.e("Scrcpy", "Audio success get frame: " + index);
 
                             // 读取 pcm 数据，写入 audiotrack 播放
-                            ByteBuffer outputBuffer = mCodec.getOutputBuffer(index);
+                            ByteBuffer outputBuffer = codec.getOutputBuffer(index);
                             if (outputBuffer != null) {
                                 byte[] data = new byte[info.size];
                                 outputBuffer.get(data);
                                 outputBuffer.clear();
-                                audioTrack.write(data, 0, info.size);
+                                track.write(data, 0, info.size);
                             }
                             // release
-                            mCodec.releaseOutputBuffer(index, true);
+                            codec.releaseOutputBuffer(index, true);
                         }
                     } else {
                         // just waiting to be configured, then decode and render
