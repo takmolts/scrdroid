@@ -76,6 +76,16 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     private boolean first_time = true;
     private boolean result_of_Rotation = false;
     private boolean serviceBound = false;
+
+    // 自動追従の振動検知。自己ミラーリング時は回転する度に逆向き映像が返り
+    // 無限に反転し続けるため、短時間に反転が連続したら自動追従を停止する。
+    // 回転で Activity が再生成されてもカウントを保持するよう static にする。
+    private static final long AUTO_FOLLOW_WINDOW_MS = 4000L; // 反転を数える時間窓
+    private static final int AUTO_FOLLOW_MAX_FLIPS = 3;      // これ以上反転したら停止
+    private static long sLastFollowRotateTime = 0L;
+    private static boolean sLastFollowLandscape = false;
+    private static int sFollowFlipCount = 0;
+    private static boolean sAutoFollowStopped = false;
     // bindService を発行済みかどうか（未バインド状態での unbind を避ける）
     private boolean serviceBindRequested = false;
     // 如果 pause 切换到后台，断开后，自动重连
@@ -506,11 +516,14 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     @Override
     public void onVideoSizeChanged(int width, int height) {
         // デコーダスレッドから呼ばれる。
-        // ここでは黒帯の再計算だけを行う。Activity の向きには手を出さない
-        // （向きを自動補正すると 再生成→再構成→再通知 のループになり回転が止まらなくなる）
         runOnUiThread(() -> {
-            if (linearLayout != null) {
-                applyVideoAspectRatio();
+            if (linearLayout == null) {
+                return;
+            }
+            applyVideoAspectRatio();
+            // 自動モードのみ、映像の実際の向きに Activity を合わせる（一致なら何もしない）
+            if (orientationMode == ORIENT_AUTO && serviceBound) {
+                followVideoOrientation(width, height);
             }
         });
     }
@@ -755,6 +768,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     private void setupFloatingMenu() {
         final Button fabToggle = findViewById(R.id.fab_toggle);
         final LinearLayout floatingPanel = findViewById(R.id.floating_panel);
+        final LinearLayout keypadPanel = findViewById(R.id.keypad_panel);
         final Button fabDisconnect = findViewById(R.id.fab_disconnect);
         final Button fabBack = findViewById(R.id.fab_back);
         final Button fabHome = findViewById(R.id.fab_home);
@@ -786,11 +800,18 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
                         lp.rightMargin = (int) (origMargin[0] - dx);
                         lp.bottomMargin = (int) (origMargin[1] - dy);
                         v.setLayoutParams(lp);
-                        // パネルも追従
+                        // メニューパネルも追従
                         FrameLayout.LayoutParams plp = (FrameLayout.LayoutParams) floatingPanel.getLayoutParams();
                         plp.rightMargin = lp.rightMargin;
                         plp.bottomMargin = lp.bottomMargin + v.getHeight() + 8;
                         floatingPanel.setLayoutParams(plp);
+                        // キーパッドパネルも同じ位置に追従（メニューと排他表示）
+                        if (keypadPanel != null) {
+                            FrameLayout.LayoutParams klp = (FrameLayout.LayoutParams) keypadPanel.getLayoutParams();
+                            klp.rightMargin = lp.rightMargin;
+                            klp.bottomMargin = lp.bottomMargin + v.getHeight() + 8;
+                            keypadPanel.setLayoutParams(klp);
+                        }
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
@@ -802,6 +823,10 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
                         } else {
                             floatingPanel.setVisibility(View.VISIBLE);
                             fabToggle.setAlpha(0.9f);
+                            // キーパッドが出ていれば畳む（同じ位置で重なるため）
+                            if (keypadPanel != null) {
+                                keypadPanel.setVisibility(View.GONE);
+                            }
                         }
                     }
                     return true;
@@ -852,6 +877,62 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         fabAppswitch.setOnClickListener(v -> {
             if (scrcpy != null) scrcpy.sendKeyevent(KeyEvent.KEYCODE_APP_SWITCH);
         });
+
+        // ロック解除キーパッドの設定
+        final Button fabKeypad = findViewById(R.id.fab_keypad);
+        if (fabKeypad != null && keypadPanel != null) {
+            // ⌨：メニューを畳んでキーパッドに切り替え
+            fabKeypad.setOnClickListener(v -> {
+                floatingPanel.setVisibility(View.GONE);
+                keypadPanel.setVisibility(View.VISIBLE);
+            });
+            // ✕：キーパッドを畳んでメニューに戻す
+            final Button keypadClose = keypadPanel.findViewById(R.id.keypad_close);
+            if (keypadClose != null) {
+                keypadClose.setOnClickListener(v -> {
+                    keypadPanel.setVisibility(View.GONE);
+                    floatingPanel.setVisibility(View.VISIBLE);
+                });
+            }
+            setupKeypad(keypadPanel);
+        }
+    }
+
+    /**
+     * ロック解除用のキーパッド。相手デバイスにキーイベントを送るだけで、
+     * PIN などの値はこのアプリ側で一切保持しない。
+     */
+    private void setupKeypad(final LinearLayout keypadPanel) {
+        // 数字キー（KEYCODE_0..9 は 7..16 に連番で並んでいる）
+        final int[] digitIds = {
+                R.id.keypad_0, R.id.keypad_1, R.id.keypad_2, R.id.keypad_3, R.id.keypad_4,
+                R.id.keypad_5, R.id.keypad_6, R.id.keypad_7, R.id.keypad_8, R.id.keypad_9
+        };
+        for (int d = 0; d < digitIds.length; d++) {
+            final Button b = keypadPanel.findViewById(digitIds[d]);
+            if (b != null) {
+                final int keycode = KeyEvent.KEYCODE_0 + d;
+                b.setOnClickListener(v -> sendKey(keycode));
+            }
+        }
+        bindKey(keypadPanel, R.id.keypad_wake, KeyEvent.KEYCODE_WAKEUP);   // 画面点灯
+        bindKey(keypadPanel, R.id.keypad_unlock, KeyEvent.KEYCODE_MENU);   // スワイプ解除→PIN画面
+        bindKey(keypadPanel, R.id.keypad_del, KeyEvent.KEYCODE_DEL);       // バックスペース
+        bindKey(keypadPanel, R.id.keypad_enter, KeyEvent.KEYCODE_ENTER);   // 確定
+        // ✕（閉じる／メニューへ戻る）は setupFloatingMenu 側で設定する
+    }
+
+    private void bindKey(final LinearLayout panel, int viewId, final int keycode) {
+        final Button b = panel.findViewById(viewId);
+        if (b != null) {
+            b.setOnClickListener(v -> sendKey(keycode));
+        }
+    }
+
+    private void sendKey(int keycode) {
+        if (scrcpy != null) {
+            scrcpy.sendKeyevent(keycode);
+        }
     }
 
 
@@ -898,30 +979,67 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         serviceBindRequested = true;
     }
 
-    @SuppressLint("SourceLockedOrientationActivity")
     @Override
     public void loadNewRotation() {
         if (first_time) {
             first_time = false;
         }
+        // ここでは Activity を回転させない。
+        // 以前は landscape を単純反転（トグル）して回転させていたが、これは
+        // 「リモートの実際の向き」ではなく「前回の逆」にするだけなので、
+        // 回転→サーバーが画面回転を検知→CONFIG再送→また反転… と無限に振動していた。
+        // 向きの追従は onVideoSizeChanged（実映像サイズ確定後）で一度だけ行う。
+        // ここではデコーダの再構成とアスペクト比の再計算のみ行う。
+        runOnUiThread(() -> {
+            if (serviceBound && scrcpy != null && surface != null && linearLayout != null) {
+                scrcpy.setParms(surface, screenWidth, screenHeight);
+                linearLayout.setPadding(0, 0, 0, 0);
+                linearLayout.post(this::set_display_nd_touch);
+            }
+        });
+    }
 
-        // 画面分割中は Activity の向きを変えられない（setRequestedOrientation が無視され、
-        // 再生成を待つと二度と戻ってこない）ため、方向固定モードと同じ扱いにする
-        if (orientationMode != ORIENT_AUTO || isInMultiWindow()) {
-            // 方向固定モード：Activity の向きは変えずデコーダだけ作り直す。
-            // アスペクト比はデコーダからの実サイズ通知で自動的に補正される
-            runOnUiThread(() -> {
-                if (serviceBound && scrcpy != null && surface != null && linearLayout != null) {
-                    scrcpy.setParms(surface, screenWidth, screenHeight);
-                    linearLayout.setPadding(0, 0, 0, 0);
-                    linearLayout.post(this::set_display_nd_touch);
-                }
-            });
+    /**
+     * 自動モードで、映像の実際の向きに Activity の向きを合わせる。
+     * 既に一致していれば何もしないため、ここで収束して振動しない。
+     */
+    @SuppressLint("SourceLockedOrientationActivity")
+    private void followVideoOrientation(int width, int height) {
+        boolean videoLandscape = width > height;
+        boolean activityLandscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        Log.i("ScrcpyRot", "follow: video=" + width + "x" + height
+                + " videoLand=" + videoLandscape + " actLand=" + activityLandscape
+                + " multiWindow=" + isInMultiWindow());
+        // 一度振動を検知して停止済みなら以後は追従しない（手動で縦/横に切替可能）
+        if (sAutoFollowStopped) {
+            landscape = videoLandscape;
             return;
         }
-
+        // 既に一致、または画面分割中（回転できない）は何もしない＝ここで止まる
+        if (videoLandscape == activityLandscape || isInMultiWindow()) {
+            landscape = videoLandscape;
+            return;
+        }
+        // ここに来る＝回転が必要。短時間に反転が連続していないか判定する。
+        long now = System.currentTimeMillis();
+        if (now - sLastFollowRotateTime < AUTO_FOLLOW_WINDOW_MS
+                && videoLandscape != sLastFollowLandscape) {
+            sFollowFlipCount++;
+        } else {
+            sFollowFlipCount = 1;
+        }
+        sLastFollowRotateTime = now;
+        sLastFollowLandscape = videoLandscape;
+        if (sFollowFlipCount >= AUTO_FOLLOW_MAX_FLIPS) {
+            // 自己ミラーリングとみなして自動追従を停止（振動を止める）
+            sAutoFollowStopped = true;
+            Log.w("ScrcpyRot", "auto-follow stopped: oscillation detected");
+            Toast.makeText(context, "向きの自動追従を停止しました", Toast.LENGTH_LONG).show();
+            landscape = videoLandscape;
+            return;
+        }
         try {
-            // 可能会导致重复解绑，所以捕获异常
             unbindService(serviceConnection);
         } catch (Exception e) {
             e.printStackTrace();
@@ -929,13 +1047,20 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         serviceBindRequested = false;
         serviceBound = false;
         result_of_Rotation = true;
-        landscape = !landscape;
-        swapDimensions();
-        if (landscape) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        } else {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-        }
+        landscape = videoLandscape;
+        setRequestedOrientation(videoLandscape
+                ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+    }
+
+    /**
+     * 自動追従の振動検知状態をリセットする。新規接続時にのみ呼ぶこと。
+     * （回転による Activity 再生成の経路では呼ばない＝ガードが効かなくなるため）
+     */
+    private void resetAutoFollowGuard() {
+        sAutoFollowStopped = false;
+        sFollowFlipCount = 0;
+        sLastFollowRotateTime = 0L;
     }
 
     /**
@@ -1191,6 +1316,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     private void connectScrcpyServer(String serverAdr) {
         if (!TextUtils.isEmpty(serverAdr)) {
+            resetAutoFollowGuard();  // 新規接続なので振動検知をリセット
             saveHistory(serverAdr);  // 保存到历史记录
             String[] serverInfo = Util.getServerHostAndPort(serverAdr);
             String serverHost = serverInfo[0];

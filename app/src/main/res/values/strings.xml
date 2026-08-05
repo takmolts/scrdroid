@@ -30,6 +30,12 @@
     <string name="fab_back">&#x25C1;</string>
     <string name="fab_home">&#x25CB;</string>
     <string name="fab_appswitch">&#x25A1;</string>
+    <string name="fab_keypad">&#x2328;</string>
+    <string name="keypad_wake">&#x1F506;</string>
+    <string name="keypad_unlock">&#x1F513;</string>
+    <string name="keypad_del">&#x232B;</string>
+    <string name="keypad_enter">&#x23CE;</string>
+    <string name="keypad_close">&#x2715;</string>
     <string name="switch0">Viewing mode (no control)</string>
     <string name="switch1">Bottom control button (back button)</string>
 
