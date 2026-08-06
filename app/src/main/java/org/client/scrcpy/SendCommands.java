@@ -9,6 +9,8 @@ import org.client.scrcpy.utils.AdbHelper;
 import org.client.scrcpy.utils.ThreadUtils;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class SendCommands {
@@ -19,6 +21,58 @@ public class SendCommands {
         SUCCESS,
         RUNNING,
         ERROR
+    }
+
+    /** 対象端末のアプリ情報（仮想ディスプレイの起動アプリ選択用） */
+    public static class AppInfo {
+        public final String pkg;
+        public final String label;
+
+        public AppInfo(String pkg, String label) {
+            this.pkg = pkg;
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            // ArrayAdapter の既定フィルタは toString() 対象。ラベル・パッケージ名の両方で検索可能にする。
+            return label + "  (" + pkg + ")";
+        }
+    }
+
+    /**
+     * 対象端末にインストールされたランチャー可能アプリの一覧を adb 経由で取得する。
+     * サーバー(app_process)を --list-apps モードで起動し、標準出力を解析する。
+     * ネットワーク I/O を行うため、必ずワーカースレッドから呼ぶこと。
+     */
+    public List<AppInfo> fetchTargetApps(Context context, String ip, int port) {
+        List<AppInfo> result = new ArrayList<>();
+        try {
+            // adb 接続を確立（既に接続済みなら無害）
+            AdbHelper.adbCmd(App.mContext, "connect", ip + ":" + port);
+            // サーバー jar を対象端末へ配置
+            AdbHelper.writeAssetsJarServer(App.mContext);
+            String jarPath = new File(context.getExternalFilesDir("scrcpy"), "scrcpy-server.jar").getAbsolutePath();
+            AdbHelper.adbCmd(App.mContext, "-s", ip + ":" + port, "push", jarPath, "/data/local/tmp/scrcpy-server.jar");
+            // アプリ一覧モードで実行し標準出力を取得
+            String out = AdbHelper.adbCmd(App.mContext, "-s", ip + ":" + port, "shell",
+                    "CLASSPATH=/data/local/tmp/scrcpy-server.jar", "app_process", "/",
+                    "org.server.scrcpy.Server", "--list-apps");
+            if (out != null) {
+                for (String line : out.split("\\r?\\n")) {
+                    if (line.startsWith("APP\t")) {
+                        String[] parts = line.split("\t", 3);
+                        if (parts.length == 3) {
+                            result.add(new AppInfo(parts[1], parts[2]));
+                        }
+                    }
+                }
+            }
+            Log.i("Scrcpy", "fetchTargetApps: " + result.size() + " apps");
+        } catch (Exception e) {
+            Log.e("Scrcpy", "fetchTargetApps error", e);
+        }
+        return result;
     }
 
     public SendCommands() {

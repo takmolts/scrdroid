@@ -15,6 +15,13 @@
     <string name="switch_force_portrait">Force portrait (lock vertical display)</string>
     <string name="switch_virtual_display">Virtual display mode (extend, independent screen)</string>
     <string name="hint_virtual_launch_package">App package to launch (blank = home/launcher)</string>
+    <string name="select_app_button">Select</string>
+    <string name="select_app_dialog_title">Select an app on the target</string>
+    <string name="select_app_loading">Fetching app list from target…</string>
+    <string name="select_app_empty">Could not get app list. Check the target address and connection.</string>
+    <string name="select_app_search_hint">Search</string>
+    <string name="select_app_home_item">(Home / launcher)</string>
+    <string name="select_app_no_host">Enter the target address first.</string>
     <string name="screen_control">Screen on connect</string>
     <string-array name="options_screen_control_keys">
         <item>No action</item>

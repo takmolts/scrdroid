@@ -25,6 +25,13 @@
   <string name="switch_force_portrait">強制縦画面表示</string>
   <string name="switch_virtual_display">仮想ディスプレイモード (拡張・独立画面)</string>
   <string name="hint_virtual_launch_package">起動するアプリのパッケージ名 (空欄=ホーム)</string>
+  <string name="select_app_button">選択</string>
+  <string name="select_app_dialog_title">対象端末のアプリを選択</string>
+  <string name="select_app_loading">対象端末からアプリ一覧を取得中…</string>
+  <string name="select_app_empty">アプリ一覧を取得できませんでした。接続先アドレスと接続状態を確認してください。</string>
+  <string name="select_app_search_hint">検索</string>
+  <string name="select_app_home_item">(ホーム / ランチャー)</string>
+  <string name="select_app_no_host">先に接続先アドレスを入力してください。</string>
   <string name="screen_control">接続時の画面</string>
   <string-array name="options_screen_control_keys">
     <item>何もしない</item>

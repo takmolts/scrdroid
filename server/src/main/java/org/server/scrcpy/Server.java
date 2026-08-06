@@ -119,6 +119,18 @@ public final class Server {
             }
         });
 
+        // アプリ一覧モード: 映像ストリーミングせず、対象端末のランチャー可能アプリ一覧を
+        // 標準出力へ出して終了する（仮想ディスプレイの起動アプリ選択用）。
+        if (args.length > 0 && "--list-apps".equals(args[0])) {
+            try {
+                Workarounds.apply();
+            } catch (Throwable e) {
+                Ln.e("Workarounds.apply failed in list mode", e);
+            }
+            AppLister.listAndPrint();
+            return;
+        }
+
         try {
             Process cmd = Runtime.getRuntime().exec("rm /data/local/tmp/scrcpy-server.jar");
             cmd.waitFor();
