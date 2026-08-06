@@ -71,6 +71,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     private int virtualDisplayWidth = 0;  // 0 = 物理画面と同一
     private int virtualDisplayHeight = 0;
     private int virtualDisplayDpi = 0;
+    private String virtualDisplayLaunchPackage = ""; // 空=ホーム/ランチャー, 指定=そのアプリを起動
     // private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF (現在無効)
     private boolean remoteLandscape = false; // リモートが横向きかどうか（forcePortrait用）
     private int screenWidth;
@@ -370,6 +371,10 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         if (switchVirtualDisplay != null) {
             switchVirtualDisplay.setChecked(PreUtils.get(context, Constant.CONTROL_VIRTUAL_DISPLAY, false));
         }
+        final EditText editVirtualLaunch = findViewById(R.id.edit_virtual_launch_package);
+        if (editVirtualLaunch != null) {
+            editVirtualLaunch.setText(PreUtils.get(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, ""));
+        }
         // setSpinner(R.array.options_screen_control_keys, R.id.screen_control_spinner, Constant.PREFERENCE_SPINNER_SCREEN_CONTROL);
         setSpinner(R.array.options_resolution_values, R.id.spinner_video_resolution, Constant.PREFERENCE_SPINNER_RESOLUTION);
         setSpinner(R.array.options_bitrate_keys, R.id.spinner_video_bitrate, Constant.PREFERENCE_SPINNER_BITRATE);
@@ -584,13 +589,20 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         } else {
             virtualDisplayMode = PreUtils.get(context, Constant.CONTROL_VIRTUAL_DISPLAY, false);
         }
-        // Phase 1: 解像度・DPI は「物理画面と同一」固定 (0=サーバ側で物理画面値採用)
+        // 解像度・DPI は「物理画面と同一」固定 (0=サーバ側で物理画面値採用)
         virtualDisplayWidth = PreUtils.get(context, Constant.CONTROL_VIRTUAL_WIDTH, 0);
         virtualDisplayHeight = PreUtils.get(context, Constant.CONTROL_VIRTUAL_HEIGHT, 0);
         virtualDisplayDpi = PreUtils.get(context, Constant.CONTROL_VIRTUAL_DPI, 0);
+        final EditText editVD = findViewById(R.id.edit_virtual_launch_package);
+        if (editVD != null) {
+            virtualDisplayLaunchPackage = editVD.getText().toString().trim();
+        } else {
+            virtualDisplayLaunchPackage = PreUtils.get(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, "");
+        }
         PreUtils.put(context, Constant.CONTROL_NO, no_control);
         PreUtils.put(context, Constant.CONTROL_FORCE_PORTRAIT, forcePortrait);
         PreUtils.put(context, Constant.CONTROL_VIRTUAL_DISPLAY, virtualDisplayMode);
+        PreUtils.put(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, virtualDisplayLaunchPackage);
         // final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
         // screenControlMode = screenControlSpinner.getSelectedItemPosition();
 
@@ -995,7 +1007,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
                         localForwardPort,
                         Scrcpy.LOCAL_IP,
                         videoBitrate, Math.max(screenHeight, screenWidth),
-                        virtualDisplayMode, virtualDisplayWidth, virtualDisplayHeight, virtualDisplayDpi);
+                        virtualDisplayMode, virtualDisplayWidth, virtualDisplayHeight, virtualDisplayDpi,
+                        virtualDisplayLaunchPackage);
                 if (sendStatus == SendCommands.CmdStatus.SUCCESS) {
                     ThreadUtils.post(() -> {
                         if (!MainActivity.this.isFinishing()) {

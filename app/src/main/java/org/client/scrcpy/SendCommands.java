@@ -27,22 +27,35 @@ public class SendCommands {
 
     public CmdStatus SendAdbCommands(Context context, final String ip, int port, int forwardport, String localip, int bitrate, int size) {
         return this.SendAdbCommands(context, null, ip, port, forwardport, localip, bitrate, size,
-                false, 0, 0, 0);
+                false, 0, 0, 0, null);
     }
 
     public CmdStatus SendAdbCommands(Context context, final byte[] fileBase64, final String ip, int port, int forwardport, String localip, int bitrate, int size) {
         return this.SendAdbCommands(context, fileBase64, ip, port, forwardport, localip, bitrate, size,
-                false, 0, 0, 0);
+                false, 0, 0, 0, null);
     }
 
     public CmdStatus SendAdbCommands(Context context, final byte[] fileBase64, final String ip, int port, int forwardport, String localip,
                                      int bitrate, int size,
                                      boolean virtualDisplayMode, int virtualWidth, int virtualHeight, int virtualDpi) {
+        return this.SendAdbCommands(context, fileBase64, ip, port, forwardport, localip, bitrate, size,
+                virtualDisplayMode, virtualWidth, virtualHeight, virtualDpi, null);
+    }
+
+    public CmdStatus SendAdbCommands(Context context, final byte[] fileBase64, final String ip, int port, int forwardport, String localip,
+                                     int bitrate, int size,
+                                     boolean virtualDisplayMode, int virtualWidth, int virtualHeight, int virtualDpi,
+                                     String virtualLaunchPackage) {
         AtomicReference<CmdStatus> status = new AtomicReference<>(CmdStatus.RUNNING);
-        // サーバ側で必要な追加引数 (Phase 1):
+        // サーバ側で必要な追加引数:
         //   tunnelForward (既存4つ目): 既定 false
         //   virtualDisplayMode (5つ目)
         //   virtualWidth / virtualHeight / virtualDpi (6/7/8つ目)
+        //   virtualLaunchPackage (9つ目): "-"=ホーム/ランチャー
+        // 空・null の場合は "-"（ホーム）として送る。shell の語分割で消えないよう非空トークンにする。
+        String launchArg = (virtualLaunchPackage == null || virtualLaunchPackage.trim().isEmpty())
+                ? "-"
+                : virtualLaunchPackage.trim();
         String[] commands = new String[]{
                 "-s", ip + ":" + port,
                 "shell",
@@ -57,7 +70,8 @@ public class SendCommands {
                 virtualDisplayMode ? "1" : "0",
                 Integer.toString(virtualWidth),
                 Integer.toString(virtualHeight),
-                Integer.toString(virtualDpi) + ";"
+                Integer.toString(virtualDpi),
+                launchArg + ";"
         };
         ThreadUtils.execute(() -> {
             try {

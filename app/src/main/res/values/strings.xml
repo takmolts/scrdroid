@@ -14,6 +14,7 @@
     <string name="back_button">\u003C</string>
     <string name="switch_force_portrait">Force portrait (lock vertical display)</string>
     <string name="switch_virtual_display">Virtual display mode (extend, independent screen)</string>
+    <string name="hint_virtual_launch_package">App package to launch (blank = home/launcher)</string>
     <string name="screen_control">Screen on connect</string>
     <string-array name="options_screen_control_keys">
         <item>No action</item>

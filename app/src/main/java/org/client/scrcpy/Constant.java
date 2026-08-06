@@ -18,6 +18,8 @@ public class Constant {
     public static final String CONTROL_VIRTUAL_WIDTH = "virtual_width";
     public static final String CONTROL_VIRTUAL_HEIGHT = "virtual_height";
     public static final String CONTROL_VIRTUAL_DPI = "virtual_dpi";
+    // 仮想ディスプレイ上に起動するアプリのパッケージ名 (空欄=ホーム/ランチャー)
+    public static final String CONTROL_VIRTUAL_LAUNCH_PACKAGE = "virtual_launch_package";
     public static final String PREFERENCE_SPINNER_SCREEN_CONTROL = "screen_control";
     public static final String HISTORY_LIST_KEY = "history_list_key";
     public static final String USER_ID = "user_id";

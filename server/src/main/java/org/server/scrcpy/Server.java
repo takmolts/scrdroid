@@ -77,11 +77,12 @@ public final class Server {
         boolean tunnelForward = Boolean.parseBoolean(args[3]);
         options.setTunnelForward(tunnelForward);
 
-        // 仮想ディスプレイモード関連オプション (Phase 1)
+        // 仮想ディスプレイモード関連オプション
         // args[4] : 仮想ディスプレイモード (0/1)
         // args[5] : 仮想ディスプレイ幅 (0=物理画面と同一)
         // args[6] : 仮想ディスプレイ高さ (0=物理画面と同一)
         // args[7] : 仮想ディスプレイ DPI (0=物理画面と同一)
+        // args[8] : 起動対象パッケージ名 ("-"/空=ホーム/ランチャー)
         if (args.length < 5) {
             return options;
         }
@@ -101,6 +102,11 @@ public final class Server {
             return options;
         }
         options.setVirtualDpi(Integer.parseInt(args[7]));
+
+        if (args.length < 9) {
+            return options;
+        }
+        options.setVirtualLaunchPackage(args[8]);
 
         return options;
     }

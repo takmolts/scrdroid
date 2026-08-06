@@ -12,6 +12,9 @@ public class Options {
     private int virtualWidth;
     private int virtualHeight;
     private int virtualDpi;
+    // 仮想ディスプレイ上に起動するアプリのパッケージ名。
+    // null / 空 の場合はホーム（ランチャー）を起動する
+    private String virtualLaunchPackage;
 
     public int getMaxSize() {
         return maxSize;
@@ -67,5 +70,23 @@ public class Options {
 
     public void setVirtualDpi(int virtualDpi) {
         this.virtualDpi = virtualDpi;
+    }
+
+    public String getVirtualLaunchPackage() {
+        return virtualLaunchPackage;
+    }
+
+    public void setVirtualLaunchPackage(String virtualLaunchPackage) {
+        this.virtualLaunchPackage = virtualLaunchPackage;
+    }
+
+    /**
+     * 仮想ディスプレイでホーム（ランチャー）を起動するか。
+     * パッケージ未指定（null / 空 / "-"）ならホームを起動する。
+     */
+    public boolean isVirtualLaunchHome() {
+        return virtualLaunchPackage == null
+                || virtualLaunchPackage.isEmpty()
+                || "-".equals(virtualLaunchPackage);
     }
 }

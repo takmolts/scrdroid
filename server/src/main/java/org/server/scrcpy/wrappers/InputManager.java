@@ -32,4 +32,31 @@ public final class InputManager {
             return false;
         }
     }
+
+    // InputEvent.setDisplayId(int) は @hide だが API 29 以降で利用可能。
+    // 仮想ディスプレイへ入力を届けるため、注入前にイベントの displayId を設定する。
+    private static Method setDisplayIdMethod;
+    private static boolean setDisplayIdUnavailable;
+
+    /**
+     * InputEvent の displayId を設定する（リフレクション）。
+     * 対象ディスプレイに入力をルーティングするために使用する。
+     *
+     * @return 設定に成功したら true
+     */
+    public static boolean setDisplayId(InputEvent inputEvent, int displayId) {
+        if (setDisplayIdUnavailable) {
+            return false;
+        }
+        try {
+            if (setDisplayIdMethod == null) {
+                setDisplayIdMethod = InputEvent.class.getMethod("setDisplayId", int.class);
+            }
+            setDisplayIdMethod.invoke(inputEvent, displayId);
+            return true;
+        } catch (ReflectiveOperationException e) {
+            setDisplayIdUnavailable = true;
+            return false;
+        }
+    }
 }

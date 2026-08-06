@@ -130,7 +130,11 @@ public class EventController {
 
                 // 为支持多点触控，新增 buffer[4] 这个字节
                 Point point = new Point(buffer[2], buffer[3]);
-                Point newpoint = device.NewgetPhysicalPoint(point);
+                // 仮想ディスプレイモードでは、仮想画面の座標系 = 送信されてくる video 座標系のため
+                // 物理画面向けのスケーリングは行わず、受信座標をそのまま使う。
+                Point newpoint = isVirtualDisplayMode()
+                        ? point
+                        : device.NewgetPhysicalPoint(point);
                 injectTouch(action, buffer[4], newpoint, buffer[1]);
             }
         }
@@ -317,7 +321,18 @@ public class EventController {
                 && injectKeyEvent(KeyEvent.ACTION_UP, keyCode, 0, 0);
     }
 
+    private boolean isVirtualDisplayMode() {
+        return device.getOptions() != null && device.getOptions().isVirtualDisplayMode();
+    }
+
     private boolean injectEvent(InputEvent event) {
+        // 仮想ディスプレイモードでは、入力を対象の VirtualDisplay にルーティングする。
+        if (isVirtualDisplayMode()) {
+            int displayId = device.getVirtualDisplayId();
+            if (displayId >= 0) {
+                InputManager.setDisplayId(event, displayId);
+            }
+        }
         return device.injectInputEvent(event, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
     }
 
