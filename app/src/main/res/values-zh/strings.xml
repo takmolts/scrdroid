@@ -7,6 +7,12 @@
     <string name="label_video_bitrate">带宽码率</string>
     <string name="label_x">x</string>
     <string name="action_start">启动连接</string>
+    <string name="server_add_title">添加连接</string>
+    <string name="server_edit_title">编辑连接</string>
+    <string name="label_ip_addr">IP地址</string>
+    <string name="label_port">端口（默认 5555）</string>
+    <string name="error_ip_empty">请输入IP地址</string>
+    <string name="error_port_invalid">端口号无效</string>
     <string name="appswitch_button">=</string>
     <string name="home_button">o</string>
     <string name="back_button">\u003C</string>

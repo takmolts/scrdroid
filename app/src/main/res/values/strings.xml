@@ -8,6 +8,15 @@
     <string name="label_video_bitrate">Bitrate</string>
     <string name="label_x">x</string>
     <string name="action_start">Start</string>
+    <string name="server_add_title">Add connection</string>
+    <string name="server_edit_title">Edit connection</string>
+    <string name="label_ip_addr">IP address</string>
+    <string name="label_port">Port (default 5555)</string>
+    <string name="error_ip_empty">Enter an IP address</string>
+    <string name="error_port_invalid">Invalid port number</string>
+    <string name="server_add_icon">＋</string>
+    <string name="history_edit_icon">&#x270E;</string>
+    <string name="history_delete_icon">&#x2715;</string>
     <string name="action_help">Help</string>
     <string name="appswitch_button">=</string>
     <string name="home_button">o</string>

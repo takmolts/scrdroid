@@ -2,6 +2,7 @@ package org.client.scrcpy;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -27,9 +28,11 @@ import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -37,6 +40,7 @@ import android.widget.LinearLayout;
 import android.widget.ListPopupWindow;
 import android.widget.Spinner;
 import android.widget.Switch;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.client.scrcpy.utils.AdbHelper;
@@ -53,7 +57,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 
@@ -331,6 +338,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             showListPopulWindow(editText);
         });
 
+        // 接続先の新規追加（IPとポートを分けて入力）
+        findViewById(R.id.button_add_server).setOnClickListener(v -> showServerEditDialog(null));
+
         // 无头模式，实际上要隐藏掉所有控件，否则会被显示出 ip 地址
         if (headlessMode) {
             View scrollView = findViewById(R.id.main_scroll_view);
@@ -341,26 +351,126 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     }
 
     private void showListPopulWindow(EditText mEditText) {
-        String[] list = getHistoryList();//要填充的数据
-        if (list.length == 0) {  // 如果list为空，则使用本机填充一个
-            list = new String[]{"127.0.0.1"};
+        final List<String> items = new ArrayList<>(Arrays.asList(getHistoryList()));
+        // 履歴が空のときは本機アドレスをプレースホルダとして表示（編集・削除は不可）
+        final boolean placeholder = items.isEmpty();
+        if (placeholder) {
+            items.add("127.0.0.1");
         }
-        final ListPopupWindow listPopupWindow;
-        listPopupWindow = new ListPopupWindow(this);
-        listPopupWindow.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list));//用android内置布局，或设计自己的样式
+        final ListPopupWindow listPopupWindow = new ListPopupWindow(this);
+        final BaseAdapter adapter = new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return items.size();
+            }
+
+            @Override
+            public Object getItem(int position) {
+                return items.get(position);
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return position;
+            }
+
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = convertView != null ? convertView
+                        : getLayoutInflater().inflate(R.layout.history_item, parent, false);
+                final String addr = items.get(position);
+                TextView text = view.findViewById(R.id.history_item_text);
+                text.setText(addr);
+                View edit = view.findViewById(R.id.history_item_edit);
+                View delete = view.findViewById(R.id.history_item_delete);
+                int visible = placeholder ? View.GONE : View.VISIBLE;
+                edit.setVisibility(visible);
+                delete.setVisibility(visible);
+                edit.setOnClickListener(v -> {
+                    listPopupWindow.dismiss();
+                    showServerEditDialog(addr);
+                });
+                delete.setOnClickListener(v -> {
+                    removeHistoryItem(addr);
+                    items.remove(addr);
+                    if (items.isEmpty()) {
+                        listPopupWindow.dismiss();
+                    } else {
+                        notifyDataSetChanged();
+                    }
+                });
+                return view;
+            }
+        };
+        listPopupWindow.setAdapter(adapter);
         listPopupWindow.setAnchorView(mEditText);//以哪个控件为基准，在该处以mEditText为基准
         listPopupWindow.setModal(true);
         listPopupWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-
-        String[] finalList = list;
-        listPopupWindow.setOnItemClickListener(new AdapterView.OnItemClickListener() {//设置项点击监听
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                mEditText.setText(finalList[i]);
-                listPopupWindow.dismiss();
-            }
+        listPopupWindow.setOnItemClickListener((adapterView, view, i, l) -> {
+            mEditText.setText(items.get(i));
+            listPopupWindow.dismiss();
         });
         listPopupWindow.show();
+    }
+
+    /**
+     * 接続先の追加・編集ダイアログ。IPとポートを分けて入力する。
+     * ポートが空のときは 5555（DEFAULT_ADB_PORT）を使う。
+     *
+     * @param existing 編集対象の履歴エントリ。null なら新規追加
+     */
+    private void showServerEditDialog(final String existing) {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_server_edit, null);
+        final EditText ipEdit = dialogView.findViewById(R.id.edit_server_ip);
+        final EditText portEdit = dialogView.findViewById(R.id.edit_server_port);
+        if (!TextUtils.isEmpty(existing)) {
+            String[] hostPort = Util.getServerHostAndPort(existing);
+            ipEdit.setText(hostPort[0]);
+            portEdit.setText(hostPort[1]);
+        }
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(existing == null ? R.string.server_add_title : R.string.server_edit_title)
+                .setView(dialogView)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.show();
+        // 入力不正のときにダイアログが閉じないよう、表示後にリスナーを差し替える
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String ip = ipEdit.getText().toString().trim();
+            String portStr = portEdit.getText().toString().trim();
+            if (TextUtils.isEmpty(ip)) {
+                Toast.makeText(context, R.string.error_ip_empty, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int port = Scrcpy.DEFAULT_ADB_PORT;
+            if (!TextUtils.isEmpty(portStr)) {
+                try {
+                    port = Integer.parseInt(portStr);
+                } catch (NumberFormatException e) {
+                    port = -1;
+                }
+            }
+            if (port < 1 || port > 65535) {
+                Toast.makeText(context, R.string.error_port_invalid, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String newAddr = ip + ":" + port;
+            EditText serverEdit = findViewById(R.id.editText_server_host);
+            if (existing == null) {
+                saveHistory(newAddr);
+                serverEdit.setText(newAddr);
+            } else {
+                updateHistoryItem(existing, newAddr);
+                if (serverEdit.getText().toString().trim().equals(existing)) {
+                    serverEdit.setText(newAddr);
+                }
+                if (existing.equals(PreUtils.get(context, Constant.CONTROL_REMOTE_ADDR, ""))) {
+                    PreUtils.put(context, Constant.CONTROL_REMOTE_ADDR, newAddr);
+                }
+            }
+            dialog.dismiss();
+        });
     }
 
 
@@ -726,6 +836,35 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             e.printStackTrace();
         }
         return false;
+    }
+
+    /**
+     * 履歴内のエントリを位置を保ったまま置き換える。
+     * 置換後の値が別の位置に既に存在する場合は重複を除く。
+     */
+    private void updateHistoryItem(String oldValue, String newValue) {
+        JSONArray historyJson = new JSONArray();
+        for (String item : getHistoryList()) {
+            if (item.equals(oldValue)) {
+                historyJson.put(newValue);
+            } else if (!item.equals(newValue)) {
+                historyJson.put(item);
+            }
+        }
+        PreUtils.put(context, Constant.HISTORY_LIST_KEY, historyJson.toString());
+    }
+
+    /**
+     * 履歴からエントリを削除する。
+     */
+    private void removeHistoryItem(String value) {
+        JSONArray historyJson = new JSONArray();
+        for (String item : getHistoryList()) {
+            if (!item.equals(value)) {
+                historyJson.put(item);
+            }
+        }
+        PreUtils.put(context, Constant.HISTORY_LIST_KEY, historyJson.toString());
     }
 
     private void swapDimensions() {
