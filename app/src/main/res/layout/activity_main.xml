@@ -271,6 +271,62 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
+            <!-- 仮想ディスプレイ (拡張ディスプレイ) モード -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Switch
+                    android:id="@+id/switch_virtual_display"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#323540"
+                    android:gravity="center_vertical"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/switch_virtual_display"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- 仮想ディスプレイに起動するアプリのパッケージ名 (空欄=ホーム) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/edit_virtual_launch_package"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="#323540"
+                    android:gravity="center_vertical"
+                    android:hint="@string/hint_virtual_launch_package"
+                    android:inputType="textNoSuggestions"
+                    android:maxLines="1"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:textColor="@color/white"
+                    android:textColorHint="#8A8A8A"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/button_select_app"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/btn_selector"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:text="@string/select_app_button"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <!-- Help button -->
             <Button
                 android:id="@+id/button_help"

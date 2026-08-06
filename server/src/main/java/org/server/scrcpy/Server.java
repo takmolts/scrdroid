@@ -76,6 +76,38 @@ public final class Server {
         // use "adb forward" instead of "adb tunnel"? (so the server must listen)
         boolean tunnelForward = Boolean.parseBoolean(args[3]);
         options.setTunnelForward(tunnelForward);
+
+        // 仮想ディスプレイモード関連オプション
+        // args[4] : 仮想ディスプレイモード (0/1)
+        // args[5] : 仮想ディスプレイ幅 (0=物理画面と同一)
+        // args[6] : 仮想ディスプレイ高さ (0=物理画面と同一)
+        // args[7] : 仮想ディスプレイ DPI (0=物理画面と同一)
+        // args[8] : 起動対象パッケージ名 ("-"/空=ホーム/ランチャー)
+        if (args.length < 5) {
+            return options;
+        }
+        options.setVirtualDisplayMode("1".equals(args[4]) || Boolean.parseBoolean(args[4]));
+
+        if (args.length < 6) {
+            return options;
+        }
+        options.setVirtualWidth(Integer.parseInt(args[5]));
+
+        if (args.length < 7) {
+            return options;
+        }
+        options.setVirtualHeight(Integer.parseInt(args[6]));
+
+        if (args.length < 8) {
+            return options;
+        }
+        options.setVirtualDpi(Integer.parseInt(args[7]));
+
+        if (args.length < 9) {
+            return options;
+        }
+        options.setVirtualLaunchPackage(args[8]);
+
         return options;
     }
 
@@ -86,6 +118,18 @@ public final class Server {
                 Ln.e("Exception on thread " + t, e);
             }
         });
+
+        // アプリ一覧モード: 映像ストリーミングせず、対象端末のランチャー可能アプリ一覧を
+        // 標準出力へ出して終了する（仮想ディスプレイの起動アプリ選択用）。
+        if (args.length > 0 && "--list-apps".equals(args[0])) {
+            try {
+                Workarounds.apply();
+            } catch (Throwable e) {
+                Ln.e("Workarounds.apply failed in list mode", e);
+            }
+            AppLister.listAndPrint();
+            return;
+        }
 
         try {
             Process cmd = Runtime.getRuntime().exec("rm /data/local/tmp/scrcpy-server.jar");

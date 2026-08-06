@@ -15,6 +15,13 @@ public class Constant {
     public static final String CONTROL_FORCE_PORTRAIT = "force_portrait";
     /** 表示方向モード: 0=自動(サーバー追従) / 1=縦固定 / 2=横固定 */
     public static final String CONTROL_ORIENTATION_MODE = "orientation_mode";
+    // 仮想ディスプレイ (拡張・独立画面) モード関連
+    public static final String CONTROL_VIRTUAL_DISPLAY = "virtual_display";
+    public static final String CONTROL_VIRTUAL_WIDTH = "virtual_width";
+    public static final String CONTROL_VIRTUAL_HEIGHT = "virtual_height";
+    public static final String CONTROL_VIRTUAL_DPI = "virtual_dpi";
+    // 仮想ディスプレイ上に起動するアプリのパッケージ名 (空欄=ホーム/ランチャー)
+    public static final String CONTROL_VIRTUAL_LAUNCH_PACKAGE = "virtual_launch_package";
     public static final String PREFERENCE_SPINNER_SCREEN_CONTROL = "screen_control";
     public static final String HISTORY_LIST_KEY = "history_list_key";
     public static final String USER_ID = "user_id";

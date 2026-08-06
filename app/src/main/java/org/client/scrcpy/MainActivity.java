@@ -3,6 +3,8 @@ package org.client.scrcpy;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -38,6 +40,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListPopupWindow;
+import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -76,6 +79,12 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     private boolean headlessMode = false;  // 是否为无头模式，不显示操作选项等
     private int orientationMode = ORIENT_AUTO; // 表示方向モード
+    // 仮想ディスプレイ (拡張・独立画面) モード
+    private boolean virtualDisplayMode = false;
+    private int virtualDisplayWidth = 0;  // 0 = 物理画面と同一
+    private int virtualDisplayHeight = 0;
+    private int virtualDisplayDpi = 0;
+    private String virtualDisplayLaunchPackage = ""; // 空=ホーム/ランチャー, 指定=そのアプリを起動
     // private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF (現在無効)
     private int screenWidth;
     private int screenHeight;
@@ -508,6 +517,18 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         }
         aSwitch0.setChecked(PreUtils.get(context, Constant.CONTROL_NO, false));
         switchForcePortrait.setChecked(PreUtils.get(context, Constant.CONTROL_FORCE_PORTRAIT, false));
+        final Switch switchVirtualDisplay = findViewById(R.id.switch_virtual_display);
+        if (switchVirtualDisplay != null) {
+            switchVirtualDisplay.setChecked(PreUtils.get(context, Constant.CONTROL_VIRTUAL_DISPLAY, false));
+        }
+        final EditText editVirtualLaunch = findViewById(R.id.edit_virtual_launch_package);
+        if (editVirtualLaunch != null) {
+            editVirtualLaunch.setText(PreUtils.get(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, ""));
+        }
+        final Button buttonSelectApp = findViewById(R.id.button_select_app);
+        if (buttonSelectApp != null) {
+            buttonSelectApp.setOnClickListener(v -> onSelectAppClicked());
+        }
         // setSpinner(R.array.options_screen_control_keys, R.id.screen_control_spinner, Constant.PREFERENCE_SPINNER_SCREEN_CONTROL);
         setSpinner(R.array.options_resolution_values, R.id.spinner_video_resolution, Constant.PREFERENCE_SPINNER_RESOLUTION);
         setSpinner(R.array.options_bitrate_keys, R.id.spinner_video_bitrate, Constant.PREFERENCE_SPINNER_BITRATE);
@@ -771,9 +792,27 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         final Switch switchFP = findViewById(R.id.switch_force_portrait);
         boolean forcePortrait = switchFP.isChecked();
         orientationMode = forcePortrait ? ORIENT_PORTRAIT : ORIENT_AUTO;
+        final Switch switchVD = findViewById(R.id.switch_virtual_display);
+        if (switchVD != null) {
+            virtualDisplayMode = switchVD.isChecked();
+        } else {
+            virtualDisplayMode = PreUtils.get(context, Constant.CONTROL_VIRTUAL_DISPLAY, false);
+        }
+        // 解像度・DPI は「物理画面と同一」固定 (0=サーバ側で物理画面値採用)
+        virtualDisplayWidth = PreUtils.get(context, Constant.CONTROL_VIRTUAL_WIDTH, 0);
+        virtualDisplayHeight = PreUtils.get(context, Constant.CONTROL_VIRTUAL_HEIGHT, 0);
+        virtualDisplayDpi = PreUtils.get(context, Constant.CONTROL_VIRTUAL_DPI, 0);
+        final EditText editVD = findViewById(R.id.edit_virtual_launch_package);
+        if (editVD != null) {
+            virtualDisplayLaunchPackage = editVD.getText().toString().trim();
+        } else {
+            virtualDisplayLaunchPackage = PreUtils.get(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, "");
+        }
         PreUtils.put(context, Constant.CONTROL_NO, no_control);
         PreUtils.put(context, Constant.CONTROL_FORCE_PORTRAIT, forcePortrait);
         PreUtils.put(context, Constant.CONTROL_ORIENTATION_MODE, orientationMode);
+        PreUtils.put(context, Constant.CONTROL_VIRTUAL_DISPLAY, virtualDisplayMode);
+        PreUtils.put(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, virtualDisplayLaunchPackage);
         // final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
         // screenControlMode = screenControlSpinner.getSelectedItemPosition();
 
@@ -1453,6 +1492,113 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     }
 
+    /**
+     * 「アプリ選択」ボタン: 現在の接続先からアプリ一覧を取得してダイアログ表示する。
+     */
+    private void onSelectAppClicked() {
+        final EditText editTextServerHost = findViewById(R.id.editText_server_host);
+        String serverAdr = editTextServerHost != null ? editTextServerHost.getText().toString().trim() : "";
+        if (TextUtils.isEmpty(serverAdr)) {
+            Toast.makeText(context, getString(R.string.select_app_no_host), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String host;
+        final int port;
+        try {
+            String[] serverInfo = Util.getServerHostAndPort(serverAdr);
+            host = serverInfo[0];
+            port = Integer.parseInt(serverInfo[1]);
+        } catch (Exception e) {
+            Toast.makeText(context, getString(R.string.select_app_no_host), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Progress.showDialog(MainActivity.this, getString(R.string.select_app_loading));
+        ThreadUtils.workPost(() -> {
+            final List<SendCommands.AppInfo> apps = sendCommands.fetchTargetApps(context, host, port);
+            ThreadUtils.post(() -> {
+                Progress.closeDialog();
+                if (MainActivity.this.isFinishing()) {
+                    return;
+                }
+                if (apps == null || apps.isEmpty()) {
+                    Toast.makeText(context, getString(R.string.select_app_empty), Toast.LENGTH_LONG).show();
+                    return;
+                }
+                showAppPickerDialog(apps);
+            });
+        });
+    }
+
+    /**
+     * 取得したアプリ一覧を検索付きダイアログで表示し、選択されたパッケージ名を入力欄へ反映する。
+     */
+    private void showAppPickerDialog(List<SendCommands.AppInfo> apps) {
+        // 先頭に「ホーム/ランチャー」（空パッケージ）を差し込む
+        final List<SendCommands.AppInfo> items = new ArrayList<>();
+        items.add(new SendCommands.AppInfo("", getString(R.string.select_app_home_item)));
+        items.addAll(apps);
+
+        final float density = getResources().getDisplayMetrics().density;
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (12 * density);
+        container.setPadding(pad, pad, pad, 0);
+
+        final EditText search = new EditText(this);
+        search.setHint(getString(R.string.select_app_search_hint));
+        search.setSingleLine(true);
+        container.addView(search, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        final ListView listView = new ListView(this);
+        container.addView(listView, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, (int) (360 * density)));
+
+        final ArrayAdapter<SendCommands.AppInfo> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_list_item_1, new ArrayList<>(items));
+        listView.setAdapter(adapter);
+
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.select_app_dialog_title))
+                .setView(container)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                adapter.getFilter().filter(s);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            SendCommands.AppInfo ai = adapter.getItem(position);
+            if (ai != null) {
+                EditText edit = findViewById(R.id.edit_virtual_launch_package);
+                if (edit != null) {
+                    edit.setText(ai.pkg);
+                }
+                // 仮想ディスプレイモードも自動的にONにしておく（アプリ選択＝拡張利用の意図）
+                Switch sw = findViewById(R.id.switch_virtual_display);
+                if (sw != null && !ai.pkg.isEmpty()) {
+                    sw.setChecked(true);
+                }
+            }
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
     private void connectScrcpyServer(String serverAdr) {
         if (!TextUtils.isEmpty(serverAdr)) {
             resetAutoFollowGuard();  // 新規接続なので振動検知をリセット
@@ -1465,11 +1611,13 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             Progress.showDialog(MainActivity.this, getString(R.string.please_wait));
             ThreadUtils.workPost(() -> {
                 AdbHelper.writeAssetsJarServer(App.mContext);
-                SendCommands.CmdStatus sendStatus = sendCommands.SendAdbCommands(context, serverHost,
+                SendCommands.CmdStatus sendStatus = sendCommands.SendAdbCommands(context, null, serverHost,
                         serverPort,
                         localForwardPort,
                         Scrcpy.LOCAL_IP,
-                        videoBitrate, Math.max(screenHeight, screenWidth));
+                        videoBitrate, Math.max(screenHeight, screenWidth),
+                        virtualDisplayMode, virtualDisplayWidth, virtualDisplayHeight, virtualDisplayDpi,
+                        virtualDisplayLaunchPackage);
                 if (sendStatus == SendCommands.CmdStatus.SUCCESS) {
                     ThreadUtils.post(() -> {
                         if (!MainActivity.this.isFinishing()) {

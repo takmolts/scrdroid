@@ -1,5 +1,6 @@
 package org.server.scrcpy.wrappers;
 
+import android.content.Context;
 import android.hardware.display.VirtualDisplay;
 import android.os.IInterface;
 import android.view.Display;
@@ -9,6 +10,7 @@ import org.server.scrcpy.DisplayInfo;
 import org.server.scrcpy.Ln;
 import org.server.scrcpy.Size;
 import org.server.scrcpy.util.Command;
+import org.server.scrcpy.util.FakeContext;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -124,5 +126,53 @@ public final class DisplayManager {
     public VirtualDisplay createVirtualDisplay(String name, int width, int height, int displayIdToMirror, Surface surface) throws Exception {
         Method method = getCreateVirtualDisplayMethod();
         return (VirtualDisplay) method.invoke(null, name, width, height, displayIdToMirror, surface);
+    }
+
+    /**
+     * 仮想ディスプレイモード用
+     * 既存 createVirtualDisplay (5引数版) は static reflection 呼び出しで動作しているが、
+     * 独立画面用の 6引数版 (flags 付き) は android.hardware.display.DisplayManager の
+     * インスタンスメソッドを直接呼ぶ必要がある。
+     *
+     * 注意: FakeContext.getSystemService(DISPLAY_SERVICE) は base(system) context に委譲され、
+     * 生成される DisplayManager が package="android"(uid 1000) で動作するため、実際の呼び出し元
+     * shell(uid 2000) と不一致になり
+     *   SecurityException: packageName must match the calling uid
+     * で失敗する。これを避けるため、FakeContext(package="com.android.shell", uid=SHELL) を
+     * 直接束ねた DisplayManager インスタンスを生成して呼び出す。
+     *
+     * 使用フラグ例:
+     *   VIRTUAL_DISPLAY_FLAG_PUBLIC = 1
+     *   VIRTUAL_DISPLAY_FLAG_PRESENTATION = 2
+     *   VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY = 8
+     *   VIRTUAL_DISPLAY_FLAG_TRUSTED = 1 << 10 (Android 11+)
+     */
+    public VirtualDisplay createVirtualDisplayWithFlags(String name, int width, int height, int dpi, Surface surface, int flags)
+            throws Exception {
+        Context ctx = FakeContext.get();
+        android.hardware.display.DisplayManager dm = newDisplayManagerWithContext(ctx);
+        return dm.createVirtualDisplay(name, width, height, dpi, surface, flags);
+    }
+
+    /**
+     * 指定 Context を束ねた android.hardware.display.DisplayManager を生成する。
+     * DisplayManager(Context) は @hide だがコンストラクタ自体は存在するためリフレクションで呼ぶ。
+     * 失敗時は getSystemService にフォールバックする。
+     */
+    private static android.hardware.display.DisplayManager newDisplayManagerWithContext(Context ctx) throws Exception {
+        try {
+            java.lang.reflect.Constructor<android.hardware.display.DisplayManager> ctor =
+                    android.hardware.display.DisplayManager.class.getDeclaredConstructor(Context.class);
+            ctor.setAccessible(true);
+            return ctor.newInstance(ctx);
+        } catch (ReflectiveOperationException e) {
+            Ln.w("newDisplayManagerWithContext: constructor reflection failed, fallback to getSystemService (" + e + ")");
+            android.hardware.display.DisplayManager dm =
+                    (android.hardware.display.DisplayManager) ctx.getSystemService(Context.DISPLAY_SERVICE);
+            if (dm == null) {
+                throw new IllegalStateException("DISPLAY_SERVICE unavailable from FakeContext");
+            }
+            return dm;
+        }
     }
 }
