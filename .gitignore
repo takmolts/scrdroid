@@ -11,6 +11,11 @@ server/build/
 # Local config
 local.properties
 
+# Signing keys (絶対にコミットしない)
+*.jks
+*.keystore
+keystore.properties
+
 # OS
 .DS_Store
 Thumbs.db
