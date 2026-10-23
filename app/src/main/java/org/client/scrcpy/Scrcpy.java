@@ -413,8 +413,11 @@ public class Scrcpy extends Service {
 
                 dataOutputStream = new DataOutputStream(newSocket.getOutputStream());
                 attempts = 0;
-                byte[] buf = new byte[16];
-                dataInputStream.read(buf, 0, 16);
+                // サーバーが送るのは解像度 (width, height) の 8 バイトのみ。
+                // 以前は read(buf, 0, 16) だったため、直後の映像パケットが同時に届いていると
+                // その先頭まで読み捨ててストリームがずれる。ちょうど 8 バイトだけ読む
+                byte[] buf = new byte[remote_dev_resolution.length * 4];
+                dataInputStream.readFully(buf, 0, buf.length);
                 for (int i = 0; i < remote_dev_resolution.length; i++) {
                     remote_dev_resolution[i] = (((int) (buf[i * 4]) << 24) & 0xFF000000) |
                             (((int) (buf[i * 4 + 1]) << 16) & 0xFF0000) |

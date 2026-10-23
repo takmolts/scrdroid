@@ -22,6 +22,8 @@ public class Constant {
     public static final String CONTROL_VIRTUAL_DPI = "virtual_dpi";
     // 仮想ディスプレイ上に起動するアプリのパッケージ名 (空欄=ホーム/ランチャー)
     public static final String CONTROL_VIRTUAL_LAUNCH_PACKAGE = "virtual_launch_package";
+    // PC セカンドスクリーンモード (adb reverse 経由で PC 側サーバーへ直接接続する)
+    public static final String CONTROL_PC_MODE = "pc_mode";
     public static final String PREFERENCE_SPINNER_SCREEN_CONTROL = "screen_control";
     public static final String HISTORY_LIST_KEY = "history_list_key";
     public static final String USER_ID = "user_id";
