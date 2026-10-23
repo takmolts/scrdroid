@@ -1171,7 +1171,11 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         runOnUiThread(() -> {
             if (serviceBound && scrcpy != null && surface != null && linearLayout != null) {
                 scrcpy.setParms(surface, screenWidth, screenHeight);
-                linearLayout.setPadding(0, 0, 0, 0);
+                // 以前はここで一旦パディングを 0 にしていたが、次フレームが来るまで映像が
+                // 縦窓いっぱいに引き伸ばされ、サーバー回転（CONFIG）が頻発すると
+                // 「上下に伸び縮」して見える原因になっていた。
+                // 直前までの映像サイズでレターボックスを維持したまま再計算する。
+                applyVideoAspectRatio();
                 linearLayout.post(this::set_display_nd_touch);
             }
         });
