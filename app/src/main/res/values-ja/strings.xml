@@ -30,7 +30,9 @@
   <string name="switch1">下部のコントロールボタン (戻るボタン)</string>
   <string name="switch_force_portrait">強制縦画面表示</string>
   <string name="switch_virtual_display">仮想ディスプレイモード (拡張・独立画面)</string>
-  <string name="switch_pc_mode">PCセカンドスクリーンモード (adb reverse / 接続先不要)</string>
+  <string name="tab_android">Android 端末</string>
+  <string name="tab_pc">PC セカンドスクリーン</string>
+  <string name="pc_mode_help">PC の extScreen で「開始」すると、このアプリが自動で起動して接続します (adb reverse 経由)。\n手動で接続する場合は、先に PC 側の extScreen を開始してから下の「開始」をタップしてください。\n解像度・向き・タッチ操作は PC 側の設定に従います。</string>
   <string name="hint_virtual_launch_package">起動するアプリのパッケージ名 (空欄=ホーム)</string>
   <string name="select_app_button">選択</string>
   <string name="select_app_dialog_title">対象端末のアプリを選択</string>

@@ -23,7 +23,9 @@
     <string name="back_button">\u003C</string>
     <string name="switch_force_portrait">Force portrait (lock vertical display)</string>
     <string name="switch_virtual_display">Virtual display mode (extend, independent screen)</string>
-    <string name="switch_pc_mode">PC second screen mode (adb reverse, no address needed)</string>
+    <string name="tab_android">Android device</string>
+    <string name="tab_pc">PC second screen</string>
+    <string name="pc_mode_help">Start extScreen on the PC and this app is launched and connected automatically (via adb reverse).\nTo connect manually, start extScreen on the PC first, then tap Start below.\nResolution, orientation and touch gestures follow the PC-side settings.</string>
     <string name="hint_virtual_launch_package">App package to launch (blank = home/launcher)</string>
     <string name="select_app_button">Select</string>
     <string name="select_app_dialog_title">Select an app on the target</string>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 接続先タブの背景. 選択中は下端に青い線を引く (minSdk 21 のため item の gravity/height は使わない) -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#323540" />
+                </shape>
+            </item>
+            <item android:top="37dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#3C93F0" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#262B33" />
+        </shape>
+    </item>
+</selector>

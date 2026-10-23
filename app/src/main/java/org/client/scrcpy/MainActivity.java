@@ -293,10 +293,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
                 || !savedInstanceState.getBoolean("from_save_instance", false);
         if (newLaunch && first_time && !headlessMode && getIntent() != null
                 && getIntent().getBooleanExtra(START_PC_MODE, false)) {
-            final Switch switchPc = findViewById(R.id.switch_pc_mode);
-            if (switchPc != null) {
-                switchPc.setChecked(true);
-            }
+            // PC タブを一時的に選ぶ (保存はしない: 通常の Android 端末接続の選択を上書きしない)
+            selectTab(true, false);
             getAttributes();
             connectPcServer();
         } else if (!newLaunch && first_time
@@ -304,6 +302,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             // PC モードの接続待ち中に作り直された (例: 横向きで起動し縦固定に切り替わった)。
             // 前の Activity の接続処理は onDestroy で片付け済みなので、ここでやり直す
             Log.i("Scrcpy", "restart pending PC mode connection after recreation");
+            selectTab(true, false);
             getAttributes();
             connectPcServer();
         }
@@ -560,10 +559,13 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         if (switchVirtualDisplay != null) {
             switchVirtualDisplay.setChecked(PreUtils.get(context, Constant.CONTROL_VIRTUAL_DISPLAY, false));
         }
-        final Switch switchPcMode = findViewById(R.id.switch_pc_mode);
-        if (switchPcMode != null) {
-            switchPcMode.setChecked(PreUtils.get(context, Constant.CONTROL_PC_MODE, false));
+        final View tabAndroid = findViewById(R.id.tab_android);
+        final View tabPc = findViewById(R.id.tab_pc);
+        if (tabAndroid != null && tabPc != null) {
+            tabAndroid.setOnClickListener(v -> selectTab(false, true));
+            tabPc.setOnClickListener(v -> selectTab(true, true));
         }
+        selectTab(PreUtils.get(context, Constant.CONTROL_PC_MODE, false), false);
         final EditText editVirtualLaunch = findViewById(R.id.edit_virtual_launch_package);
         if (editVirtualLaunch != null) {
             editVirtualLaunch.setText(PreUtils.get(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, ""));
@@ -834,9 +836,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         boolean no_control = a_Switch0.isChecked();
         final Switch switchFP = findViewById(R.id.switch_force_portrait);
         boolean forcePortrait = switchFP.isChecked();
-        final Switch switchPc = findViewById(R.id.switch_pc_mode);
-        pcMode = switchPc != null ? switchPc.isChecked()
-                : PreUtils.get(context, Constant.CONTROL_PC_MODE, false);
+        // pcMode は選択中のタブ (selectTab) で決まる。
         // PC モードは PC 側の仮想モニタの向きに合わせるのが前提なので、
         // 強制縦画面の設定は適用せず常に映像の向きへ自動追従させる
         orientationMode = (forcePortrait && !pcMode) ? ORIENT_PORTRAIT : ORIENT_AUTO;
@@ -861,7 +861,6 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         PreUtils.put(context, Constant.CONTROL_ORIENTATION_MODE, orientationMode);
         PreUtils.put(context, Constant.CONTROL_VIRTUAL_DISPLAY, virtualDisplayMode);
         PreUtils.put(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, virtualDisplayLaunchPackage);
-        PreUtils.put(context, Constant.CONTROL_PC_MODE, pcMode);
         // final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
         // screenControlMode = screenControlSpinner.getSelectedItemPosition();
 
@@ -1713,6 +1712,42 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         } else {
             Toast.makeText(context, "Server Address Empty", Toast.LENGTH_SHORT).show();
             connectExitExt();
+        }
+    }
+
+    /**
+     * 接続先タブ (Android 端末 / PC セカンドスクリーン) を切り替える。
+     * 「開始」の動作と表示する設定項目がタブで変わる。
+     *
+     * @param pc      PC セカンドスクリーンのタブを選ぶなら true
+     * @param persist 次回起動時のために保存するか (利用者がタブを押した時だけ true。
+     *                PC からの自動起動では保存せず、通常接続の選択を上書きしない)
+     */
+    private void selectTab(boolean pc, boolean persist) {
+        pcMode = pc;
+        if (persist) {
+            PreUtils.put(context, Constant.CONTROL_PC_MODE, pc);
+        }
+        final View tabAndroid = findViewById(R.id.tab_android);
+        final View tabPc = findViewById(R.id.tab_pc);
+        if (tabAndroid == null || tabPc == null) {
+            return;  // メイン画面以外 (映像表示中) では何もしない
+        }
+        tabAndroid.setSelected(!pc);
+        tabPc.setSelected(pc);
+        tabAndroid.setAlpha(pc ? 0.6f : 1f);
+        tabPc.setAlpha(pc ? 1f : 0.6f);
+        final int androidOnly = pc ? View.GONE : View.VISIBLE;
+        for (int id : new int[]{R.id.row_server_host, R.id.row_resolution_bitrate,
+                R.id.switch_force_portrait, R.id.row_virtual_display, R.id.row_virtual_launch}) {
+            View v = findViewById(id);
+            if (v != null) {
+                v.setVisibility(androidOnly);
+            }
+        }
+        View help = findViewById(R.id.text_pc_mode_help);
+        if (help != null) {
+            help.setVisibility(pc ? View.VISIBLE : View.GONE);
         }
     }
 
