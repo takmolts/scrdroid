@@ -90,4 +90,5 @@
     <item>2048000</item>
     <item>1024000</item>
   </integer-array>
+  <string name="server_stopped">PC 側で配信が停止されました</string>
 </resources>

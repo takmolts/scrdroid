@@ -233,6 +233,11 @@ public class ScrcpyHost implements Scrcpy.ServiceCallbacks {
     }
 
     @Override
+    public void serverStopped() {
+        // フローティングウィンドウ側は切断時の処理を持たないため何もしない
+    }
+
+    @Override
     public void onVideoSizeChanged(int width, int height) {
         // フローティングウィンドウ側は固定サイズ表示のため何もしない
     }

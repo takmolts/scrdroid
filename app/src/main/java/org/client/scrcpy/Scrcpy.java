@@ -24,8 +24,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PushbackInputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -64,6 +66,10 @@ public class Scrcpy extends Service {
     private volatile int videoHeight = 0;
 
     private volatile Socket socket = null;
+    // 受信が無いときに相手の切断 (EOF) を確かめるため、1 バイト先読みして戻せるようにする
+    private volatile PushbackInputStream socketPushback = null;
+    // 切断確認 (EOF チェック) の間隔
+    private static final long EOF_CHECK_INTERVAL_MS = 500;
     private DataInputStream socketInputStream = null;
     private DataOutputStream socketOutputStream = null;
 
@@ -397,7 +403,9 @@ public class Scrcpy extends Service {
                     // waitResolutionCount 为 10，等待100ms 也就是共计一秒钟，设置attempts 为 5，也就是 5秒后则退出
                     attempts = 5;
                 }
-                dataInputStream = new DataInputStream(newSocket.getInputStream());
+                PushbackInputStream pushbackIn = new PushbackInputStream(newSocket.getInputStream(), 1);
+                socketPushback = pushbackIn;
+                dataInputStream = new DataInputStream(pushbackIn);
                 int waitResolutionCount = 10;
                 while (dataInputStream.available() <= 0 && waitResolutionCount > 0) {
                     waitResolutionCount--;
@@ -505,6 +513,37 @@ public class Scrcpy extends Service {
         return false;
     }
 
+    /**
+     * 受信データが無いときに、相手が接続を閉じたかどうかを確かめる。
+     * 1 バイトだけ短いタイムアウトで読み、読めたら戻す (データを失わない)。
+     */
+    private boolean isRemoteClosed() {
+        Socket current = socket;
+        PushbackInputStream in = socketPushback;
+        if (current == null || in == null) {
+            return false;
+        }
+        try {
+            current.setSoTimeout(1);
+            int b = in.read();
+            if (b < 0) {
+                return true;
+            }
+            in.unread(b);
+            return false;
+        } catch (SocketTimeoutException e) {
+            return false;  // データが無いだけ (接続は生きている)
+        } catch (IOException e) {
+            return true;   // リセットなど
+        } finally {
+            try {
+                current.setSoTimeout(0);
+            } catch (IOException ignore) {
+                // 閉じたソケットでは失敗するが、その場合は次の処理で切断になる
+            }
+        }
+    }
+
     private void loop(DataInputStream dataInputStream, DataOutputStream dataOutputStream, int delay) throws InterruptedException {
         VideoPacket.StreamSettings streamSettings = null;
         byte[] packetSize = new byte[4];
@@ -514,7 +553,7 @@ public class Scrcpy extends Service {
         long lastAudioOffset = 0;
 
         boolean waitKeyFrame = false;
-
+        long lastEofCheck = System.currentTimeMillis();
 
         while (LetServceRunning.get()) {
             boolean waitEvent = true;
@@ -547,6 +586,24 @@ public class Scrcpy extends Service {
                     }
                 }
 
+                // available() は相手が接続を閉じても 0 のままなので、受信が無い間は
+                // 定期的に EOF を確かめる (確かめないと最後のフレームが表示され続ける)
+                if (dataInputStream.available() <= 0) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastEofCheck >= EOF_CHECK_INTERVAL_MS) {
+                        lastEofCheck = now;
+                        if (isRemoteClosed()) {
+                            Log.i("Scrcpy", "connection closed by server");
+                            ServiceCallbacks callbacks = serviceCallbacks;
+                            LetServceRunning.set(false);
+                            if (callbacks != null) {
+                                callbacks.errorDisconnect();
+                            }
+                            return;
+                        }
+                    }
+                }
+
                 if (dataInputStream.available() > 0) {
                     waitEvent = false;
                     dataInputStream.readFully(packetSize, 0, 4);
@@ -562,6 +619,16 @@ public class Scrcpy extends Service {
                     dataInputStream.readFully(packet, 0, size);
                     if (MediaPacket.Type.getType(packet[0]) == MediaPacket.Type.VIDEO) {
                         VideoPacket videoPacket = VideoPacket.readHead(packet);
+                        if (videoPacket.flag == VideoPacket.Flag.END) {
+                            // サーバーが配信を終了した (PC 側での停止など)。確認なしで切断する
+                            Log.i("Scrcpy", "stream END received");
+                            ServiceCallbacks callbacks = serviceCallbacks;
+                            LetServceRunning.set(false);
+                            if (callbacks != null) {
+                                callbacks.serverStopped();
+                            }
+                            return;
+                        }
                         // byte[] data = videoPacket.data;
                         final boolean isConfigPacket = videoPacket.flag == VideoPacket.Flag.CONFIG;
                         if (isConfigPacket || updateAvailable.get()) {
@@ -596,9 +663,6 @@ public class Scrcpy extends Service {
                                 // キーフレームを要求するだけで、フレームの取捨選択やタイミング判定には触れない
                                 pendingCommands.offer(CommandPacket.CmdType.VIDEO_NEW_KEY_FRAME);
                             }
-                        } else if (videoPacket.flag == VideoPacket.Flag.END) {
-                            // need close stream
-                            Log.e("Scrcpy", "END ... ");
                         } else {
                             // Log.e("Scrcpy", "videoPacket presentationTimeStamp ... " + videoPacket.presentationTimeStamp);
                             // 帧在 100 ms 以内
@@ -664,6 +728,11 @@ public class Scrcpy extends Service {
         void loadNewRotation();
 
         void errorDisconnect();
+
+        /**
+         * サーバーが配信を正常に終了した (END を受信した)。通信スレッドから呼ばれる。
+         */
+        void serverStopped();
 
         /**
          * デコーダが実映像サイズを確定／変更したときに通知される。

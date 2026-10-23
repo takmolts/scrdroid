@@ -1399,6 +1399,21 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     }
 
     @Override
+    public void serverStopped() {
+        // PC 側 (サーバー) で配信が停止された。確認ダイアログは出さずにメニュー画面へ戻る
+        runOnUiThread(() -> {
+            if (isDestroyed()) {
+                return;
+            }
+            Toast.makeText(context, R.string.server_stopped, Toast.LENGTH_SHORT).show();
+            if (serviceBound) {
+                showMainView(true);  // 利用者の操作による切断と同じ扱い (再接続の確認を出さない)
+                first_time = true;
+            }
+        });
+    }
+
+    @Override
     public void errorDisconnect() {
         // 必须退出
         // 退出重连

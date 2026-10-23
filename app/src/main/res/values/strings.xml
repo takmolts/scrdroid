@@ -123,6 +123,7 @@
         <item>1024000</item>
     </integer-array>
 
+    <string name="server_stopped">Streaming was stopped on the server</string>
 </resources>
 
 
