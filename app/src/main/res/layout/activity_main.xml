@@ -291,6 +291,26 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
+            <!-- PC セカンドスクリーンモード (PC 側サーバーへ adb reverse で接続) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Switch
+                    android:id="@+id/switch_pc_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#323540"
+                    android:gravity="center_vertical"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="@string/switch_pc_mode"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <!-- 仮想ディスプレイに起動するアプリのパッケージ名 (空欄=ホーム) -->
             <LinearLayout
                 android:layout_width="match_parent"

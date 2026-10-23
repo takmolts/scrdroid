@@ -71,6 +71,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     // 是否直接连接远程
     public final static String START_REMOTE = "start_remote_headless";
+    // PC から起動されたとき PC セカンドスクリーンモードで即接続する
+    // 例: adb shell am start -S -n org.client.scrcpy/.MainActivity --ez pc_mode true
+    public final static String START_PC_MODE = "pc_mode";
 
     // 表示方向モード
     public static final int ORIENT_AUTO = 0;      // サーバー（リモート）の向きに追従
@@ -85,6 +88,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     private int virtualDisplayHeight = 0;
     private int virtualDisplayDpi = 0;
     private String virtualDisplayLaunchPackage = ""; // 空=ホーム/ランチャー, 指定=そのアプリを起動
+    // PC セカンドスクリーンモード (adb reverse 経由で PC 側サーバーへ直接接続)
+    private boolean pcMode = false;
     // private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF (現在無効)
     private int screenWidth;
     private int screenHeight;
@@ -273,6 +278,18 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             getAttributes();
             connectScrcpyServer(PreUtils.get(this, Constant.CONTROL_REMOTE_ADDR, ""));
         }
+        // PC から pc_mode 付きで起動された場合（回転による再生成時は除く）
+        boolean newLaunch = savedInstanceState == null
+                || !savedInstanceState.getBoolean("from_save_instance", false);
+        if (newLaunch && first_time && !headlessMode && getIntent() != null
+                && getIntent().getBooleanExtra(START_PC_MODE, false)) {
+            final Switch switchPc = findViewById(R.id.switch_pc_mode);
+            if (switchPc != null) {
+                switchPc.setChecked(true);
+            }
+            getAttributes();
+            connectPcServer();
+        }
         if (headlessMode) {
             View scrollView = findViewById(R.id.main_scroll_view);
             if (scrollView != null) {
@@ -324,7 +341,11 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         startButton.setOnClickListener(v -> {
             // local_ip = wifiIpAddress();
             getAttributes();
-            connectScrcpyServer(serverAdr);
+            if (pcMode) {
+                connectPcServer();
+            } else {
+                connectScrcpyServer(serverAdr);
+            }
         });
 
         final Button helpButton = findViewById(R.id.button_help);
@@ -520,6 +541,10 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         final Switch switchVirtualDisplay = findViewById(R.id.switch_virtual_display);
         if (switchVirtualDisplay != null) {
             switchVirtualDisplay.setChecked(PreUtils.get(context, Constant.CONTROL_VIRTUAL_DISPLAY, false));
+        }
+        final Switch switchPcMode = findViewById(R.id.switch_pc_mode);
+        if (switchPcMode != null) {
+            switchPcMode.setChecked(PreUtils.get(context, Constant.CONTROL_PC_MODE, false));
         }
         final EditText editVirtualLaunch = findViewById(R.id.edit_virtual_launch_package);
         if (editVirtualLaunch != null) {
@@ -791,7 +816,12 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         boolean no_control = a_Switch0.isChecked();
         final Switch switchFP = findViewById(R.id.switch_force_portrait);
         boolean forcePortrait = switchFP.isChecked();
-        orientationMode = forcePortrait ? ORIENT_PORTRAIT : ORIENT_AUTO;
+        final Switch switchPc = findViewById(R.id.switch_pc_mode);
+        pcMode = switchPc != null ? switchPc.isChecked()
+                : PreUtils.get(context, Constant.CONTROL_PC_MODE, false);
+        // PC モードは PC 側の仮想モニタの向きに合わせるのが前提なので、
+        // 強制縦画面の設定は適用せず常に映像の向きへ自動追従させる
+        orientationMode = (forcePortrait && !pcMode) ? ORIENT_PORTRAIT : ORIENT_AUTO;
         final Switch switchVD = findViewById(R.id.switch_virtual_display);
         if (switchVD != null) {
             virtualDisplayMode = switchVD.isChecked();
@@ -813,6 +843,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         PreUtils.put(context, Constant.CONTROL_ORIENTATION_MODE, orientationMode);
         PreUtils.put(context, Constant.CONTROL_VIRTUAL_DISPLAY, virtualDisplayMode);
         PreUtils.put(context, Constant.CONTROL_VIRTUAL_LAUNCH_PACKAGE, virtualDisplayLaunchPackage);
+        PreUtils.put(context, Constant.CONTROL_PC_MODE, pcMode);
         // final Spinner screenControlSpinner = findViewById(R.id.screen_control_spinner);
         // screenControlMode = screenControlSpinner.getSelectedItemPosition();
 
@@ -1640,6 +1671,17 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             Toast.makeText(context, "Server Address Empty", Toast.LENGTH_SHORT).show();
             connectExitExt();
         }
+    }
+
+    /**
+     * PC セカンドスクリーンモードで接続する。
+     * PC 側で adb reverse tcp:7008 tcp:7008 が設定済みの前提で、端末上での
+     * adb 接続・サーバー転送は行わず 127.0.0.1:7008 (PC 側サーバー) へ直接つなぐ。
+     */
+    private void connectPcServer() {
+        resetAutoFollowGuard();  // 新規接続なので振動検知をリセット
+        Progress.showDialog(MainActivity.this, getString(R.string.please_wait));
+        start_screen_copy_magic();
     }
 
     /**
