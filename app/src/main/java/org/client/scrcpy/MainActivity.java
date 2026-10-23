@@ -332,6 +332,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     @SuppressLint("SourceLockedOrientationActivity")
     public void scrcpy_main() {
+        setKeepScreenOn(false);  // メニュー画面では通常どおり消灯させる
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             this.getWindow().setStatusBarColor(getColor(R.color.status_bar));
         } else {
@@ -962,6 +963,9 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     @SuppressLint("ClickableViewAccessibility")
     private void start_screen_copy_magic() {
+        // 映像の表示中は無操作でも画面を消さない (セカンドスクリーンとして眺めるだけの使い方のため)。
+        // 放置は「自動切断」の設定で止まる
+        setKeepScreenOn(true);
         setContentView(R.layout.surface);
         final View decorView = getWindow().getDecorView();
         decorView.setSystemUiVisibility(
@@ -1712,6 +1716,14 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         } else {
             Toast.makeText(context, "Server Address Empty", Toast.LENGTH_SHORT).show();
             connectExitExt();
+        }
+    }
+
+    private void setKeepScreenOn(boolean keepOn) {
+        if (keepOn) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
     }
 
