@@ -25,7 +25,8 @@ public final class Progress {
     @SuppressLint("InvalidWakeLockTag")
     public static void showDialog(Activity context, String title, String msg, boolean setup) {
         ThreadUtils.post(() -> {
-            if (context == null || context.isFinishing()) {
+            // 表示は post で遅れて実行されるため、その間に作り直しで破棄された Activity には出さない
+            if (context == null || context.isFinishing() || context.isDestroyed()) {
                 return;
             }
             if (progressDialog != null) {

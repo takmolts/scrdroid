@@ -90,6 +90,8 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
     private String virtualDisplayLaunchPackage = ""; // 空=ホーム/ランチャー, 指定=そのアプリを起動
     // PC セカンドスクリーンモード (adb reverse 経由で PC 側サーバーへ直接接続)
     private boolean pcMode = false;
+    // PC モードで接続を開始し、まだ確立していない (作り直し後にやり直すために保存する)
+    private boolean pcConnectPending = false;
     // private int screenControlMode = 0; // 0=none, 1=ON, 2=OFF (現在無効)
     private int screenWidth;
     private int screenHeight;
@@ -152,7 +154,14 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
                         }
                     }, SendCommands.WAIT_TIME, TimeUnit.MILLISECONDS);
                     ThreadUtils.post(() -> {
+                        // 接続待ちの間に Activity が作り直された場合、この結果は古い Activity のもの。
+                        // サービスは共有なので新しい Activity の接続成功を拾ってしまうことがあり、
+                        // ここで処理すると新しい側のダイアログを閉じたり誤ったトーストを出したりする
+                        if (isDestroyed()) {
+                            return;
+                        }
                         Progress.closeDialog();
+                        pcConnectPending = false;
                         if (!success) {
                             if (serviceBound) {
                                 showMainView();
@@ -216,6 +225,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
 
     // userDisconnect ：是否为用户手动断开连接
     private void showMainView(boolean userDisconnect) {
+        pcConnectPending = false;
         stopAutoDisconnectTimer();
         releaseScrcpyService();
         if (surface != null) {
@@ -289,6 +299,13 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             }
             getAttributes();
             connectPcServer();
+        } else if (!newLaunch && first_time
+                && savedInstanceState.getBoolean("pc_connect_pending", false)) {
+            // PC モードの接続待ち中に作り直された (例: 横向きで起動し縦固定に切り替わった)。
+            // 前の Activity の接続処理は onDestroy で片付け済みなので、ここでやり直す
+            Log.i("Scrcpy", "restart pending PC mode connection after recreation");
+            getAttributes();
+            connectPcServer();
         }
         if (headlessMode) {
             View scrollView = findViewById(R.id.main_scroll_view);
@@ -304,6 +321,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
         Log.i("Scrcpy", "enter onSaveInstanceState");
         outState.putBoolean("from_save_instance", true);
         outState.putBoolean("first_time", first_time);
+        outState.putBoolean("pc_connect_pending", pcConnectPending && first_time);
         outState.putBoolean("landscape", landscape);
         outState.putBoolean("headlessMode", headlessMode);  // 第二次进入时，intent会被重置，需要保存状态
         outState.putInt("orientationMode", orientationMode);
@@ -1407,6 +1425,16 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
             if (sensorManager != null) {
                 sensorManager.unregisterListener(this);
             }
+        } else if (first_time) {
+            // 接続が確立する前の作り直し。途中の接続 (バインドや接続待ち) が宙に浮き、
+            // ダイアログも閉じられなくなるため、ここで片付ける。PC モードなら新しい
+            // Activity が onCreate で接続をやり直す
+            Progress.closeDialog();
+            releaseScrcpyService();
+            scrcpy = null;
+            if (sensorManager != null) {
+                sensorManager.unregisterListener(this);
+            }
         }
         super.onDestroy();
     }
@@ -1679,6 +1707,7 @@ public class MainActivity extends Activity implements Scrcpy.ServiceCallbacks, S
      * adb 接続・サーバー転送は行わず 127.0.0.1:7008 (PC 側サーバー) へ直接つなぐ。
      */
     private void connectPcServer() {
+        pcConnectPending = true;
         resetAutoFollowGuard();  // 新規接続なので振動検知をリセット
         Progress.showDialog(MainActivity.this, getString(R.string.please_wait));
         start_screen_copy_magic();
